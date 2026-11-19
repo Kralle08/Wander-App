@@ -2,7 +2,7 @@ import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
 import { SUPABASE_URL, SUPABASE_KEY, TOUR_YEAR } from './config.js';
 
 const sb = createClient(SUPABASE_URL, SUPABASE_KEY, {
-  auth: { persistSession: true, autoRefreshToken: true, detectSessionInUrl: false }
+  auth: { persistSession: true, autoRefreshToken: true, detectSessionInUrl: true, flowType: 'pkce' }
 });
 
 const app = document.getElementById('app');
@@ -117,7 +117,7 @@ function viewLogin() {
         <button class="btn block" data-action="sendCode" ${L.busy ? 'disabled' : ''}>Code schicken</button>
       ` : `
         <p class="title">Code eingeben</p>
-        <p class="muted">Wir haben einen Code an <b>${esc(L.email)}</b> geschickt. Schau auch im Spam-Ordner nach.</p>
+        <p class="muted">Wir haben dir eine Mail an <b>${esc(L.email)}</b> geschickt. Steht darin ein Code, gib ihn hier ein. Steht darin ein Link, tipp ihn an, am besten auf diesem Gerät und in diesem Browser. Schau auch im Spam-Ordner nach.</p>
         <label class="field">Code
           <input class="code-input" inputmode="numeric" autocomplete="one-time-code" maxlength="6" data-input="loginCode" value="${esc(L.code)}">
         </label>
@@ -133,7 +133,7 @@ async function sendCode() {
   const email = S.login.email.trim().toLowerCase();
   if (!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(email)) { S.login.error = 'Bitte eine gültige E-Mail-Adresse eingeben.'; return render(); }
   S.login.busy = true; S.login.error = ''; render();
-  const { error } = await sb.auth.signInWithOtp({ email, options: { shouldCreateUser: true } });
+  const { error } = await sb.auth.signInWithOtp({ email, options: { shouldCreateUser: true, emailRedirectTo: location.origin + location.pathname } });
   S.login.busy = false;
   if (error) { S.login.error = 'Das hat nicht geklappt: ' + error.message; return render(); }
   S.login.email = email; S.login.step = 'code'; render();
@@ -747,5 +747,12 @@ if ('serviceWorker' in navigator) navigator.serviceWorker.register('sw.js').catc
   S.session = data.session;
   if (S.session) { try { await afterLogin(); } catch (e) { render(); } }
   else render();
-  sb.auth.onAuthStateChange((_e, session) => { S.session = session; if (!session) { S.me = null; render(); } });
+  sb.auth.onAuthStateChange((event, session) => {
+    S.session = session;
+    if (!session) { S.me = null; render(); return; }
+    if (event === 'SIGNED_IN' && !S.me) {
+      if (location.search.includes('code=')) history.replaceState(null, '', location.pathname);
+      setTimeout(() => { afterLogin().catch(() => render()); }, 0);
+    }
+  });
 })();
