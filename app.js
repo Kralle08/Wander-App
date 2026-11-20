@@ -376,8 +376,7 @@ function viewRiddleCard(cr, lr, first) {
     html += `<div class="riddle-top"><span class="label">Das große Rätsel</span><span class="rchip">20 Runden</span></div>
       <p class="rq">Das erste Rätsel startet in</p>
       <div class="count4 rcount" id="riddleStart" data-target="${esc(first.publish_at)}">${countHtml(first.publish_at)}</div>
-      <p class="rsmall">Ab ${fmtDateTime(first.publish_at)} alle 14 Tage ein neues Rätsel. </p>
-      <div class="rstamp"><b>Der Rätselkönig bekommt:</b><br>🔑 erste Zimmerwahl auf Mallorca<br>➕ Bonuspunkte in der Pool-Olympiade<br>🎯 freie Wahl einer Olympia-Disziplin</div>`;
+      <p class="rsmall">Ab ${fmtDateTime(first.publish_at)} alle 14 Tage ein neues Rätsel. Wer am Ende vorne liegt, sucht sich auf Mallorca als Erster sein Zimmer aus.</p>`;
   } else {
     html += `<span class="label">Rätsel</span><p class="rq">Alle 20 Rätsel sind gelöst.</p>`;
   }
@@ -474,12 +473,12 @@ function viewQuiz() {
   let lastPts = null, lastRank = 0;
   const rows = S.leaderboard.map((r, i) => {
     const rank = r.points === lastPts ? lastRank : i + 1; lastPts = r.points; lastRank = rank;
-    return `<div class="row"><span class="rank">${rank}</span><div class="grow"><b>${esc(r.nickname)}</b><span class="muted small">${rank === 1 && resolved ? 'Aktuell Rätselkönig' : r.answered + ' beantwortet'}</span></div><span class="pts">${r.points}</span></div>`;
+    return `<div class="row"><span class="rank">${rank}</span><div class="grow"><b>${esc(r.nickname)}</b><span class="muted small">${rank === 1 && resolved ? 'Aktuell Rätselkönig · erstes Zimmerwahlrecht' : r.answered + ' beantwortet'}</span></div><span class="pts">${r.points}</span></div>`;
   }).join('');
   return `
     <div class="card dark"><span class="label">Rätselwertung</span>
       <p class="title">${resolved ? `Stand nach Rätsel ${resolved} von ${S.riddles.length || 20}` : 'Noch kein Rätsel aufgelöst'}</p>
-      <p class="muted">Wird nach jeder Auflösung alle 14 Tage aktualisiert. Der Rätselkönig bekommt die erste Zimmerwahl auf Mallorca, Bonuspunkte in der Pool-Olympiade und darf eine Olympia-Disziplin frei bestimmen.</p>
+      <p class="muted">Wird nach jeder Auflösung alle 14 Tage aktualisiert. Platz 1 hat auf Mallorca das erste Zimmerwahlrecht, Platz 1–3 bekommen einen Bonus in der Pool-Olympiade.</p>
     </div>
     <div class="card"><div class="list">${rows || '<p class="muted">Noch keine Punkte.</p>'}</div></div>
     <p class="muted small">${esc(S.members.filter((m) => m.is_quizmaster).map((m) => m.nickname).join(', '))} schreibt die Rätsel und spielt außer Konkurrenz.</p>`;
@@ -498,8 +497,8 @@ function viewOlympia() {
     </div></div>
     ${unlock ? '' : `<div class="card pine"><span class="label">Noch geheim</span><p class="title">Die Disziplinen werden am 01.06.2027 enthüllt.</p><p class="muted">Bis dahin: schwimmen üben, Arschbombe perfektionieren.</p></div>`}
     <div class="card"><span class="label">Startvorteile aus der Rätselwertung</span>
-      <p style="margin:0;font-size:14px"><b>Der Rätselkönig</b> startet mit Bonuspunkten und bestimmt eine Disziplin frei.</p>
-      <p style="margin:0;font-size:14px">Dazu gibt es für ihn die erste Zimmerwahl auf Mallorca.</p>
+      <p style="margin:0;font-size:14px"><b>Platz 1:</b> bestimmt eine Zusatzdisziplin.</p>
+      <p style="margin:0;font-size:14px"><b>Platz 2 und 3:</b> je ein Joker, um eine Disziplin zu wiederholen.</p>
     </div>
   </div>`;
 }
