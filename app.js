@@ -68,7 +68,7 @@ async function q(promise) {
 
 // ---------------------------------------------------------------- Laden
 async function loadAll() {
-  const [members, tours, organizers, photos, schedule, stages, reveals, revealContents, riddles, solutions, slots] = await Promise.all([
+  const [members, tours, organizers, photos, schedule, stages, reveals, revealContents, riddles, solutions, slots, riddleSched] = await Promise.all([
     q(sb.from('members').select('*').order('nickname')),
     q(sb.from('tours').select('*').order('year', { ascending: false })),
     q(sb.from('tour_organizers').select('*')),
@@ -79,10 +79,14 @@ async function loadAll() {
     q(sb.from('reveal_contents').select('*')),
     q(sb.from('riddles').select('*').order('nr')),
     q(sb.from('riddle_solutions').select('*')),
-    q(sb.from('orga_slots').select('*'))
+    q(sb.from('orga_slots').select('*')),
+    q(sb.rpc('riddle_schedule'))
   ]);
   S.members = members; S.tours = tours; S.organizers = organizers; S.stages = stages;
-  S.reveals = reveals; S.riddles = riddles; S.slots = slots; S.photos = photos; S.schedule = schedule;
+  S.reveals = reveals;
+  // Fahrplan für alle 20 Etappen; Fragen nur für bereits veröffentlichte Rätsel
+  const full = Object.fromEntries(riddles.map((r) => [r.id, r]));
+  S.riddles = (riddleSched.length ? riddleSched : riddles).map((r) => full[r.id] || { ...r, question: null }); S.slots = slots; S.photos = photos; S.schedule = schedule;
   S.revealContents = Object.fromEntries(revealContents.map((r) => [r.reveal_id, r]));
   S.solutions = Object.fromEntries(solutions.map((s) => [s.riddle_id, s]));
   S.tour = tours.find((t) => t.year === TOUR_YEAR) || null;
@@ -112,7 +116,7 @@ function applyPreview() {
   S.stages = o.stages.filter((s) => !s.is_secret || (s.reveal_at && new Date(s.reveal_at).getTime() <= t));
   const ids = new Set(S.stages.map((s) => s.id));
   S.schedule = o.schedule.filter((x) => ids.has(x.stage_id));
-  S.riddles = o.riddles.filter((r) => new Date(r.publish_at).getTime() <= t);
+  S.riddles = o.riddles.map((r) => new Date(r.publish_at).getTime() <= t ? r : { id: r.id, nr: r.nr, publish_at: r.publish_at, resolve_at: r.resolve_at, question: null });
   S.solutions = Object.fromEntries(Object.entries(o.solutions).filter(([rid]) => {
     const r = o.riddles.find((x) => x.id === Number(rid)); return r && new Date(r.resolve_at).getTime() <= t;
   }));
