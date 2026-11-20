@@ -420,9 +420,9 @@ function viewEtappen() {
     <div class="card"><div class="list">
       ${st.map((s) => `<div class="row"><span class="daybox">${esc(s.day_label)}</span><div class="grow"><b>${esc(s.title)}</b><span class="muted small">${esc(s.meta || '')}</span></div></div>`).join('')}
     </div></div>
-    ${hidden.length ? `<div class="card pine"><span class="label">Noch geheim</span>
-      <p class="title">${hidden.length} ${hidden.length === 1 ? 'Enthüllung steht' : 'Enthüllungen stehen'} noch aus</p>
-      ${hidden.map((r) => `<p class="muted">${esc(r.teaser)} · ${fmtDateTime(r.reveal_at)}</p>`).join('')}
+    ${hidden.length ? `<div class="card pine"><span class="label">Noch geheim · ${hidden.length} ${hidden.length === 1 ? 'Etappe' : 'Etappen'}</span>
+      <p class="title" style="font-size:24px">Sei nicht so ungeduldig.</p>
+      <p class="muted">Die restlichen Etappen werden enthüllt, wenn es so weit ist. Bis dahin: Wanderschuhe einlaufen und Füße still halten.</p>
     </div>` : ''}
   </div>`;
 }
