@@ -151,3 +151,12 @@ h1, h2, h3 { font-family: Archivo, sans-serif; font-weight: 900; margin: 0; line
 .lightbox { position: fixed; inset: 0; z-index: 40; background: rgba(10,15,12,.92); display: flex; align-items: center; justify-content: center; padding: 16px; }
 .lightbox img { max-width: 100%; max-height: 100%; border-radius: 8px; }
 .lightbox .close { position: absolute; top: calc(12px + env(safe-area-inset-top)); right: 12px; background: #fff; }
+
+/* Teilnahme-Knöpfe */
+.yesno { display: grid; grid-template-columns: 1.4fr 1fr; gap: 10px; }
+.yn { min-height: 54px; border-radius: 14px; border: 2px solid; background: #fff; font-weight: 800; font-size: 16px; cursor: pointer; box-shadow: 0 2px 0 rgba(23,36,28,.12); }
+.yn:active { transform: translateY(1px); box-shadow: none; }
+.yn.yes { border-color: var(--pine); color: var(--pine); }
+.yn.yes.on { background: var(--pine); color: #fff; }
+.yn.no { border-color: var(--accent-dark); color: var(--accent-dark); }
+.yn.no.on { background: var(--accent-dark); color: #fff; }

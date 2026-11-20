@@ -285,8 +285,9 @@ function viewStart() {
     <div class="card">
       <span class="label">Teilnahme ${TOUR_YEAR}</span>
       <p class="title">Bist du auf Mallorca dabei?</p>
-      <div class="seg" style="grid-template-columns:1fr 1fr;background:none;padding:0;gap:8px">
-        ${['ja', 'nein'].map((s) => `<button class="opt center ${myStatus === s ? (s === 'ja' ? 'on' : 'on-no') : ''}" data-action="rsvp" data-status="${s}">${s === 'ja' ? 'Ja, ich bin dabei' : 'Nein'}</button>`).join('')}
+      <div class="yesno">
+        <button class="yn yes ${myStatus === 'ja' ? 'on' : ''}" data-action="rsvp" data-status="ja">${myStatus === 'ja' ? '✓ ' : ''}Ja, ich bin dabei</button>
+        <button class="yn no ${myStatus === 'nein' ? 'on' : ''}" data-action="rsvp" data-status="nein">${myStatus === 'nein' ? '✓ ' : ''}Nein</button>
       </div>
       <p class="muted small">${cnt.ja} dabei · ${cnt.nein} nicht dabei · ${cnt.offen} offen</p>
       <button class="btn ghost" data-action="open" data-overlay="teil">Wer ist dabei?</button>
