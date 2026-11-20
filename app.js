@@ -413,7 +413,7 @@ function shortCount(target) {
 // ---------------------------------------------------------------- Ansichten: Etappen
 function viewEtappen() {
   const st = S.stages.filter((s) => s.tour_id === S.tour?.id);
-  const hidden = S.reveals.filter((r) => !r.is_joke && /Tag|feiern/.test(r.teaser) && new Date(r.reveal_at).getTime() > now());
+  const hidden = S.reveals.filter((r) => !r.is_joke && /Tag/.test(r.teaser) && new Date(r.reveal_at).getTime() > now());
   return `<div class="pad">
     <h2 style="font-size:30px">Die Etappen</h2>
     <p class="muted">${esc(S.tour?.region || '')} · ${S.tour ? fmtDate(S.tour.date_from) + '–' + fmtDate(S.tour.date_to) : ''}</p>
