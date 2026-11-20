@@ -184,3 +184,10 @@ h1, h2, h3 { font-family: Archivo, sans-serif; font-weight: 900; margin: 0; line
 .rsolve { background: #fff; color: var(--ink); border-radius: 14px; padding: 12px 14px; display: flex; flex-direction: column; gap: 4px; }
 .card.riddle .rlink { color: #fff; }
 .card.riddle .btn.light { color: var(--accent-dark); }
+
+/* iPhone-Statusleiste: fester Streifen oben, Seiten beginnen darunter */
+.app::before { content: ''; position: fixed; top: 0; left: 0; right: 0; height: env(safe-area-inset-top); background: var(--pine); z-index: 15; }
+.main > .pad:first-child { padding-top: calc(20px + env(safe-area-inset-top)); }
+.overlay { padding-top: env(safe-area-inset-top); }
+.overlay-inner { padding-top: 12px; }
+.lightbox { padding-top: calc(16px + env(safe-area-inset-top)); }
