@@ -199,3 +199,7 @@ h1, h2, h3 { font-family: Archivo, sans-serif; font-weight: 900; margin: 0; line
 .tl { display: flex; align-items: flex-start; gap: 12px; padding: 10px 0; border-bottom: 1px solid #EEF1EA; }
 .tl:last-child { border-bottom: none; }
 .tltime { flex: none; min-width: 56px; font-family: Archivo, sans-serif; font-weight: 900; font-size: 18px; color: var(--accent); font-variant-numeric: tabular-nums; }
+
+/* Vorschau-Leiste */
+.previewbar { position: sticky; top: env(safe-area-inset-top); z-index: 45; display: flex; justify-content: space-between; align-items: center; gap: 10px; background: #F5B58C; color: var(--ink); padding: 10px 16px; font-size: 14px; font-weight: 700; }
+.previewbar button { border: none; background: var(--ink); color: #fff; border-radius: 999px; padding: 8px 14px; font-weight: 700; cursor: pointer; }

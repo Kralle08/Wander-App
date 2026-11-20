@@ -39,7 +39,9 @@ const S = {
   login: { step: 'email', email: '', code: '', busy: false, error: '' },
   kasse: { title: '', amount: '', paidBy: null, forIds: null, busy: false },
   guestName: '',
-  notice: ''
+  notice: '',
+  preview: false,
+  _orig: null
 };
 
 // ---------------------------------------------------------------- Hilfen
@@ -50,7 +52,8 @@ const fmtDate = (d) => { const x = new Date(d); return `${pad(x.getDate())}.${pa
 const fmtDateTime = (d) => { const x = new Date(d); return `${fmtDate(x)} um ${pad(x.getHours())}:${pad(x.getMinutes())} Uhr`; };
 const nick = (id) => S.members.find((m) => m.id === id)?.nickname ?? '?';
 const now = () => Date.now();
-const isAdmin = () => !!S.me?.is_admin;
+const isAdmin = () => !!S.me?.is_admin && !S.preview;
+const isQuizmaster = () => !!S.me?.is_quizmaster && !S.preview;
 
 function toast(msg) {
   S.notice = msg; render();
@@ -98,7 +101,28 @@ async function loadAll() {
   S.packing = Object.fromEntries(packing.map((p) => [p.item_key, p.checked]));
   S.expenses = expenses; S.shares = shares;
   await loadRiddleExtras();
+  if (S.preview) applyPreview();
   await refreshPhotoUrls();
+}
+
+// Vorschau als Mitglied: blendet alles aus, was nur die Reiseleitung sehen darf
+function applyPreview() {
+  const t = now();
+  const o = S._orig = { stages: S.stages, schedule: S.schedule, solutions: S.solutions, revealContents: S.revealContents, riddles: S.riddles };
+  S.stages = o.stages.filter((s) => !s.is_secret || (s.reveal_at && new Date(s.reveal_at).getTime() <= t));
+  const ids = new Set(S.stages.map((s) => s.id));
+  S.schedule = o.schedule.filter((x) => ids.has(x.stage_id));
+  S.riddles = o.riddles.filter((r) => new Date(r.publish_at).getTime() <= t);
+  S.solutions = Object.fromEntries(Object.entries(o.solutions).filter(([rid]) => {
+    const r = o.riddles.find((x) => x.id === Number(rid)); return r && new Date(r.resolve_at).getTime() <= t;
+  }));
+  S.revealContents = Object.fromEntries(Object.entries(o.revealContents).filter(([rid]) => {
+    const r = S.reveals.find((x) => x.id === Number(rid)); return r && new Date(r.reveal_at).getTime() <= t;
+  }));
+}
+function endPreview() {
+  if (S._orig) Object.assign(S, S._orig);
+  S._orig = null; S.preview = false;
 }
 
 async function loadRiddleExtras() {
@@ -329,6 +353,7 @@ function viewStart() {
       <button class="tile" data-action="open" data-overlay="pack"><b>Packliste</b><span>${packDoneCount()} von ${PACK_TOTAL} gepackt</span></button>
       <button class="tile" data-action="open" data-overlay="teil"><b>Teilnehmer</b><span>${cnt.ja} Zusagen</span></button>
     </div>
+    ${S.me.is_admin && !S.preview ? `<button class="btn ghost" data-action="previewOn">Als Mitglied ansehen (Vorschau)</button>` : ''}
     <button class="btn ghost" data-action="logout">Abmelden (${esc(S.me.nickname)})</button>
   </div>`;
 }
@@ -356,7 +381,7 @@ function viewNotifCard() {
 
 function viewRiddleCard(cr, lr, first) {
   const players = S.members.filter((m) => !m.is_guest && !m.is_quizmaster).length;
-  const meQuiz = !!S.me.is_quizmaster;
+  const meQuiz = isQuizmaster();
   const lb = S.leaderboard.find((r) => r.member_id === S.me.id);
   let myRank = null;
   if (lb) { const better = S.leaderboard.filter((r) => r.points > lb.points).length; myRank = better + 1; }
@@ -714,7 +739,8 @@ function render() {
   else if (S.overlay && S.overlay.year) ov = viewYear(S.overlay.year);
   else if (S.overlay && S.overlay.stage) ov = viewStage(S.overlay.stage);
   if (S.lightbox) ov += `<div class="lightbox" data-action="closeLightbox"><img src="${esc(S.lightbox)}" alt="Foto"><button class="close" aria-label="Schließen">×</button></div>`;
-  app.innerHTML = `<main class="main">${body}</main>
+  const banner = S.preview ? `<div class="previewbar"><span>Vorschau: So sehen es die Jungs</span><button data-action="previewOff">Beenden</button></div>` : '';
+  app.innerHTML = `${banner}<main class="main">${body}</main>
     <nav class="nav" aria-label="Hauptnavigation"><div class="nav-inner">
       ${TABS.map(([k, l]) => `<button class="${S.tab === k ? 'on' : ''}" data-action="tab" data-tab="${k}">${ICONS[k]}<span>${l}</span></button>`).join('')}
     </div></nav>
@@ -734,6 +760,8 @@ const actions = {
   open(el) { S.overlay = el.dataset.overlay; S.kasse.forIds = null; render(); },
   openYear(el) { S.overlay = { year: Number(el.dataset.year) }; render(); },
   close() { S.overlay = null; render(); },
+  previewOn() { S.preview = true; S.overlay = null; applyPreview(); window.scrollTo(0, 0); render(); toast('Vorschau aktiv: Du siehst die App wie ein normales Mitglied.'); },
+  previewOff() { endPreview(); render(); },
   openStage(el) { S.overlay = { stage: Number(el.dataset.id) }; S.sched = { time: '', title: '', note: '' }; render(); },
   async schedAdd(el) {
     const F = S.sched;
@@ -886,6 +914,8 @@ app.addEventListener('click', (ev) => {
   const el = ev.target.closest('[data-action]');
   if (!el || el.disabled) return;
   const fn = actions[el.dataset.action];
+  const WRITES = ['rsvp', 'cycleRsvp', 'answer', 'saveEstimate', 'slotAdd', 'slotDel', 'pack', 'kSave', 'kDel', 'saveEmail', 'addGuest'];
+  if (S.preview && WRITES.includes(el.dataset.action)) { ev.preventDefault(); toast('In der Vorschau wird nichts gespeichert.'); return; }
   if (fn) { ev.preventDefault(); Promise.resolve(fn(el)).catch((e) => console.error(e)); }
 });
 function resizeImage(file, max = 1600, quality = 0.82) {
