@@ -110,7 +110,7 @@ function viewLogin() {
     <div class="card">
       ${L.step === 'email' ? `
         <p class="title">Anmelden</p>
-        <p class="muted">Gib deine E-Mail-Adresse ein. Du bekommst einen 6-stelligen Code.</p>
+        <p class="muted">Gib deine E-Mail-Adresse ein. Du bekommst einen Code per Mail.</p>
         <label class="field">E-Mail
           <input type="email" inputmode="email" autocomplete="email" data-input="loginEmail" value="${esc(L.email)}" placeholder="name@beispiel.de">
         </label>
@@ -119,7 +119,7 @@ function viewLogin() {
         <p class="title">Code eingeben</p>
         <p class="muted">Wir haben dir eine Mail an <b>${esc(L.email)}</b> geschickt. Steht darin ein Code, gib ihn hier ein. Steht darin ein Link, tipp ihn an, am besten auf diesem Gerät und in diesem Browser. Schau auch im Spam-Ordner nach.</p>
         <label class="field">Code
-          <input class="code-input" inputmode="numeric" autocomplete="one-time-code" maxlength="6" data-input="loginCode" value="${esc(L.code)}">
+          <input class="code-input" inputmode="numeric" autocomplete="one-time-code" maxlength="10" data-input="loginCode" value="${esc(L.code)}">
         </label>
         <button class="btn block" data-action="verifyCode" ${L.busy ? 'disabled' : ''}>Anmelden</button>
         <button class="btn ghost" data-action="backToEmail">Andere E-Mail-Adresse</button>
@@ -141,7 +141,7 @@ async function sendCode() {
 
 async function verifyCode() {
   const token = S.login.code.replace(/\D/g, '');
-  if (token.length !== 6) { S.login.error = 'Der Code hat 6 Ziffern.'; return render(); }
+  if (token.length < 6 || token.length > 10) { S.login.error = 'Bitte den vollständigen Code aus der Mail eingeben.'; return render(); }
   S.login.busy = true; S.login.error = ''; render();
   const { data, error } = await sb.auth.verifyOtp({ email: S.login.email, token, type: 'email' });
   S.login.busy = false;
