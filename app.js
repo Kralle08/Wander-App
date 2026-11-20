@@ -354,7 +354,8 @@ function viewRiddleCard(cr, lr, first) {
 
   if (cr) {
     const mine = S.myAnswers[cr.id];
-    html += `<div class="riddle-top"><span class="label">Rätsel #${cr.nr} von ${S.riddles.length}</span>
+    html += `<p class="rbrand">Wer weiß denn sowas?</p>
+      <div class="riddle-top"><span class="label">Der Rätselsteig · Etappe ${cr.nr} von ${S.riddles.length}</span>
       <span class="rchip">${cr.kind === 'schaetzen' ? 'Schätzfrage · ' + cr.points + ' Punkte' : cr.kind === 'mallorca' ? 'Mallorca' : 'Aus dem Archiv'}</span></div>
       <p class="rq">${esc(cr.question)}</p>`;
     if (meQuiz) {
@@ -373,12 +374,13 @@ function viewRiddleCard(cr, lr, first) {
       <div class="rbar"><i style="width:${players ? Math.round(Math.min(S.riddleCount, players) / players * 100) : 0}%"></i></div>
       <p class="rsmall">${S.riddleCount} von ${players} haben getippt${!meQuiz && !mine ? ' · du fehlst noch!' : ''}${myRank && !meQuiz ? ` · Du bist aktuell auf Platz ${myRank}` : ''}</p>`;
   } else if (first && new Date(first.publish_at).getTime() > now()) {
-    html += `<div class="riddle-top"><span class="label">Das große Rätsel</span><span class="rchip">20 Runden</span></div>
-      <p class="rq">Das erste Rätsel startet in</p>
+    html += `<p class="rbrand">Wer weiß denn sowas?</p>
+      <div class="riddle-top"><span class="label">Der Rätselsteig · 20 Etappen bis Mallorca</span></div>
+      <p class="rq" style="font-size:20px">Die erste Etappe startet in</p>
       <div class="count4 rcount" id="riddleStart" data-target="${esc(first.publish_at)}">${countHtml(first.publish_at)}</div>
       <p class="rsmall">Ab ${fmtDateTime(first.publish_at)} alle 14 Tage ein neues Rätsel. Wer am Ende vorne liegt, sucht sich auf Mallorca als Erster sein Zimmer aus.</p>`;
   } else {
-    html += `<span class="label">Rätsel</span><p class="rq">Alle 20 Rätsel sind gelöst.</p>`;
+    html += `<p class="rbrand">Wer weiß denn sowas?</p><span class="label">Der Rätselsteig</span><p class="rq">Alle 20 Etappen sind geschafft.</p>`;
   }
 
   if (lr && S.solutions[lr.id]) {
@@ -386,7 +388,7 @@ function viewRiddleCard(cr, lr, first) {
     const right = lr.kind === 'schaetzen' ? Number(sol.numeric_answer).toLocaleString('de-DE') : (lr.options || [])[sol.correct_option];
     const mineLast = S.myAnswers[lr.id];
     const iWasRight = mineLast && (lr.kind === 'schaetzen' ? S.lastRight.some((x) => x.startsWith(S.me.nickname + ' ')) : mineLast.option_index === sol.correct_option);
-    html += `<div class="rsolve"><span class="label" style="color:var(--accent)">Auflösung #${lr.nr}</span>
+    html += `<div class="rsolve"><span class="label" style="color:var(--accent)">Auflösung Etappe ${lr.nr}</span>
       <p style="margin:0;font-weight:800;font-size:17px">${esc(right)}</p>
       <p class="muted small" style="margin:0">${esc(sol.explanation || '')}</p>
       <p style="margin:0;font-size:14px"><b>${lr.kind === 'schaetzen' ? 'Am nächsten dran' : 'Richtig lagen'}:</b> ${S.lastRight.length ? esc(S.lastRight.join(', ')) : 'niemand. Peinlich.'}</p>
@@ -484,8 +486,8 @@ function viewQuiz() {
     return `<div class="row"><span class="rank">${rank}</span><div class="grow"><b>${esc(r.nickname)}</b><span class="muted small">${rank === 1 && resolved ? 'Aktuell Rätselkönig · erstes Zimmerwahlrecht' : r.answered + ' beantwortet'}</span></div><span class="pts">${r.points}</span></div>`;
   }).join('');
   return `
-    <div class="card dark"><span class="label">Rätselwertung</span>
-      <p class="title">${resolved ? `Stand nach Rätsel ${resolved} von ${S.riddles.length || 20}` : 'Noch kein Rätsel aufgelöst'}</p>
+    <div class="card dark"><span class="label">Wer weiß denn sowas? · Der Rätselsteig</span>
+      <p class="title">${resolved ? `Stand nach Etappe ${resolved} von ${S.riddles.length || 20}` : 'Noch keine Etappe aufgelöst'}</p>
       <p class="muted">Wird nach jeder Auflösung alle 14 Tage aktualisiert. Platz 1 hat auf Mallorca das erste Zimmerwahlrecht, Platz 1–3 bekommen einen Bonus in der Pool-Olympiade.</p>
     </div>
     <div class="card"><div class="list">${rows || '<p class="muted">Noch keine Punkte.</p>'}</div></div>

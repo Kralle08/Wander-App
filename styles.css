@@ -191,3 +191,4 @@ h1, h2, h3 { font-family: Archivo, sans-serif; font-weight: 900; margin: 0; line
 .overlay { padding-top: env(safe-area-inset-top); }
 .overlay-inner { padding-top: 12px; }
 .lightbox { padding-top: calc(16px + env(safe-area-inset-top)); }
+.rbrand { margin: 0; font-family: Archivo, sans-serif; font-weight: 900; font-size: 30px; line-height: 1; letter-spacing: -0.01em; }
