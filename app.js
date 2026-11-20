@@ -296,7 +296,7 @@ function viewStart() {
       <div class="card dark"><span class="label">Enthüllungen</span><p class="title">Alles enthüllt. Ab nach Mallorca!</p></div>
     ` : `
       <div class="card dark">
-        <span class="label">Nächste Enthüllung · ${Math.min(rv.done + 1, rv.total)} von ${rv.total}</span>
+        <span class="label">${rv.done === 0 ? 'Erste Enthüllung' : 'Nächste Enthüllung'} · ${Math.min(rv.done + 1, rv.total)} von ${rv.total}</span>
         <p class="title">${esc(rv.next.teaser)}</p>
         <div class="count4" id="revealCount">${countHtml(rv.next.reveal_at)}</div>
         <div class="bars">${Array.from({ length: rv.total }, (_, i) => `<i class="${i < rv.done ? 'on' : ''}" style="${i === rv.done ? 'background:#fff' : ''}"></i>`).join('')}</div>
