@@ -186,7 +186,7 @@ h1, h2, h3 { font-family: Archivo, sans-serif; font-weight: 900; margin: 0; line
 .card.riddle .btn.light { color: var(--accent-dark); }
 
 /* iPhone-Statusleiste: fester Streifen oben, Seiten beginnen darunter */
-.app::before { content: ''; position: fixed; top: 0; left: 0; right: 0; height: env(safe-area-inset-top); background: var(--pine); z-index: 15; }
+.app::before { content: ''; position: fixed; top: 0; left: 0; right: 0; height: env(safe-area-inset-top); background: var(--pine); z-index: 50; }
 .main > .pad:first-child { padding-top: calc(20px + env(safe-area-inset-top)); }
 .overlay { padding-top: env(safe-area-inset-top); }
 .overlay-inner { padding-top: 12px; }
