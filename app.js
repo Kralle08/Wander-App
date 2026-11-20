@@ -492,7 +492,7 @@ function viewQuiz() {
     <p class="muted small">${esc(S.members.filter((m) => m.is_quizmaster).map((m) => m.nickname).join(', '))} schreibt die Rätsel und spielt außer Konkurrenz.</p>`;
 }
 
-// ---------------------------------------------------------------- Ansichten: Olympia
+// ---------------------------------------------------------------- Ansichten: Olympiade
 function viewOlympia() {
   const unlock = new Date('2027-06-01T20:00:00+02:00').getTime() <= now();
   return `<div class="pad">
@@ -650,7 +650,7 @@ const ICONS = {
   archiv: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="5" rx="1"/><path d="M5 9v10a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1V9"/><path d="M10 13h4"/></svg>',
   olympia: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M2 16c2 0 2-1.5 4-1.5S8 16 10 16s2-1.5 4-1.5 2 1.5 4 1.5 2-1.5 4-1.5"/><path d="M2 20c2 0 2-1.5 4-1.5S8 20 10 20s2-1.5 4-1.5 2 1.5 4 1.5 2-1.5 4-1.5"/><circle cx="15" cy="5" r="2"/><path d="M8 12l3-4 3 2 3-2"/></svg>'
 };
-const TABS = [['start', 'Start'], ['etappen', 'Etappen'], ['ranking', 'Ranking'], ['archiv', 'Archiv'], ['olympia', 'Olympia']];
+const TABS = [['start', 'Start'], ['etappen', 'Etappen'], ['ranking', 'Ranking'], ['archiv', 'Archiv'], ['olympia', 'Olympiade']];
 
 function render() {
   if (!S.session) { app.innerHTML = viewLogin(); return; }
