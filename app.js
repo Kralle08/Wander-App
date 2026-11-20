@@ -381,7 +381,7 @@ function viewRanking() {
 }
 
 function viewOrga() {
-  const years = [2028, 2029, 2030, 2031, 2032];
+  const years = [TOUR_YEAR + 1];
   const counts = {};
   S.organizers.filter((o) => S.tours.find((t) => t.id === o.tour_id && t.year < TOUR_YEAR))
     .forEach((o) => { counts[o.member_id] = (counts[o.member_id] || 0) + 1; });
@@ -390,7 +390,7 @@ function viewOrga() {
   return `
     <div class="card">
       <span class="label">Orga-Kalender</span>
-      <p class="muted">Wer übernimmt die nächsten Jahre? Allein oder zu zweit.</p>
+      <p class="muted">Wer übernimmt die Tour ${TOUR_YEAR + 1}? Allein oder zu zweit.</p>
       ${years.map((y) => `<div style="display:flex;flex-direction:column;gap:6px;padding-top:8px;border-top:1px solid #E6EAE2">
         <b style="font-family:Archivo;font-size:17px;color:var(--pine)">${y}</b>
         <div class="slotgrid">${[1, 2].map((slot) => {
