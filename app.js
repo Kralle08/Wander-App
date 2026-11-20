@@ -25,6 +25,8 @@ const S = {
   rsvps: [],
   slots: [],
   photos: [],
+  schedule: [],
+  sched: { time: '', title: '', note: '' },
   photoUrls: {},
   lightbox: null,
   uploading: '',
@@ -63,11 +65,12 @@ async function q(promise) {
 
 // ---------------------------------------------------------------- Laden
 async function loadAll() {
-  const [members, tours, organizers, photos, stages, reveals, revealContents, riddles, solutions, slots] = await Promise.all([
+  const [members, tours, organizers, photos, schedule, stages, reveals, revealContents, riddles, solutions, slots] = await Promise.all([
     q(sb.from('members').select('*').order('nickname')),
     q(sb.from('tours').select('*').order('year', { ascending: false })),
     q(sb.from('tour_organizers').select('*')),
     q(sb.from('tour_photos').select('*').order('sort').order('id')),
+    q(sb.from('stage_schedule').select('*').order('at_time')),
     q(sb.from('stages').select('*').order('sort')),
     q(sb.from('reveals').select('*').order('reveal_at')),
     q(sb.from('reveal_contents').select('*')),
@@ -76,7 +79,7 @@ async function loadAll() {
     q(sb.from('orga_slots').select('*'))
   ]);
   S.members = members; S.tours = tours; S.organizers = organizers; S.stages = stages;
-  S.reveals = reveals; S.riddles = riddles; S.slots = slots; S.photos = photos;
+  S.reveals = reveals; S.riddles = riddles; S.slots = slots; S.photos = photos; S.schedule = schedule;
   S.revealContents = Object.fromEntries(revealContents.map((r) => [r.reveal_id, r]));
   S.solutions = Object.fromEntries(solutions.map((s) => [s.riddle_id, s]));
   S.tour = tours.find((t) => t.year === TOUR_YEAR) || null;
@@ -418,7 +421,11 @@ function viewEtappen() {
     <h2 style="font-size:30px">Die Etappen</h2>
     <p class="muted">${esc(S.tour?.region || '')} · ${S.tour ? fmtDate(S.tour.date_from) + '–' + fmtDate(S.tour.date_to) : ''}</p>
     <div class="card"><div class="list">
-      ${st.map((s) => `<div class="row"><span class="daybox">${esc(s.day_label)}</span><div class="grow"><b>${esc(s.title)}</b><span class="muted small">${esc(s.meta || '')}</span></div></div>`).join('')}
+      ${st.map((s) => {
+        const n = S.schedule.filter((x) => x.stage_id === s.id).length;
+        return `<button class="row rowbtn" data-action="openStage" data-id="${s.id}"><span class="daybox">${esc(s.day_label)}</span><span class="grow"><b>${esc(s.title)}</b><span class="muted small">${esc(s.meta || '')}</span>
+          <span class="small" style="color:var(--accent-dark);font-weight:700">${n ? `Tagesablauf · ${n} ${n === 1 ? 'Punkt' : 'Punkte'}` : (isAdmin() ? 'Tagesablauf eintragen' : 'Tagesablauf folgt')}</span></span><span aria-hidden="true" style="color:var(--muted);font-size:20px">›</span></button>`;
+      }).join('')}
     </div></div>
     ${hidden.length ? `<div class="card pine"><span class="label">Noch geheim · ${hidden.length} ${hidden.length === 1 ? 'Etappe' : 'Etappen'}</span>
       <p class="title" style="font-size:24px">Sei nicht so ungeduldig.</p>
@@ -632,6 +639,32 @@ function viewKasse() {
     </div></div>`);
 }
 
+function viewStage(id) {
+  const s = S.stages.find((x) => x.id === id);
+  if (!s) return '';
+  const items = S.schedule.filter((x) => x.stage_id === id).sort((a, b) => a.at_time.localeCompare(b.at_time));
+  const F = S.sched;
+  return overlayShell(`Etappe · ${s.day_label}`, `
+    <h2 style="font-size:28px">${esc(s.title)}</h2>
+    ${s.meta ? `<p class="muted">${esc(s.meta)}</p>` : ''}
+    ${s.description ? `<p style="margin:0;line-height:1.5">${esc(s.description)}</p>` : ''}
+    <div class="card"><span class="label">Tagesablauf</span>
+      ${items.length ? `<div class="timeline">${items.map((x) => `<div class="tl">
+        <span class="tltime">${esc(x.at_time)}</span>
+        <div class="grow"><b>${esc(x.title)}</b>${x.note ? `<span class="muted small" style="display:block">${esc(x.note)}</span>` : ''}</div>
+        ${isAdmin() ? `<button class="pill nein" data-action="schedDel" data-id="${x.id}" aria-label="Punkt löschen">×</button>` : ''}
+      </div>`).join('')}</div>` : `<p class="muted">${isAdmin() ? 'Noch nichts eingetragen.' : 'Der Tagesablauf folgt. Die Reiseleitung ist dran.'}</p>`}
+    </div>
+    ${isAdmin() ? `<div class="card dark"><span class="label">Punkt hinzufügen</span>
+      <div style="display:grid;grid-template-columns:110px 1fr;gap:8px">
+        <label class="field" style="color:#fff">Uhrzeit<input type="time" data-input="schedTime" value="${esc(F.time)}"></label>
+        <label class="field" style="color:#fff">Was?<input type="text" data-input="schedTitle" value="${esc(F.title)}" placeholder="z. B. Taxi holt uns ab"></label>
+      </div>
+      <label class="field" style="color:#fff">Hinweis (optional)<input type="text" data-input="schedNote" value="${esc(F.note)}" placeholder="z. B. Treffpunkt vor der Finca"></label>
+      <button class="btn" data-action="schedAdd" data-stage="${s.id}">Hinzufügen</button>
+    </div>` : ''}`);
+}
+
 function viewYear(year) {
   const t = S.tours.find((x) => x.year === year);
   if (!t) return '';
@@ -679,6 +712,7 @@ function render() {
   else if (S.overlay === 'teil') ov = viewTeil();
   else if (S.overlay === 'kasse') ov = viewKasse();
   else if (S.overlay && S.overlay.year) ov = viewYear(S.overlay.year);
+  else if (S.overlay && S.overlay.stage) ov = viewStage(S.overlay.stage);
   if (S.lightbox) ov += `<div class="lightbox" data-action="closeLightbox"><img src="${esc(S.lightbox)}" alt="Foto"><button class="close" aria-label="Schließen">×</button></div>`;
   app.innerHTML = `<main class="main">${body}</main>
     <nav class="nav" aria-label="Hauptnavigation"><div class="nav-inner">
@@ -700,6 +734,20 @@ const actions = {
   open(el) { S.overlay = el.dataset.overlay; S.kasse.forIds = null; render(); },
   openYear(el) { S.overlay = { year: Number(el.dataset.year) }; render(); },
   close() { S.overlay = null; render(); },
+  openStage(el) { S.overlay = { stage: Number(el.dataset.id) }; S.sched = { time: '', title: '', note: '' }; render(); },
+  async schedAdd(el) {
+    const F = S.sched;
+    if (!/^\d{1,2}:\d{2}$/.test(F.time)) return toast('Bitte eine Uhrzeit eingeben.');
+    if (!F.title.trim()) return toast('Bitte eintragen, was passiert.');
+    const row = await q(sb.from('stage_schedule').insert({ stage_id: Number(el.dataset.stage), at_time: F.time.padStart(5, '0'), title: F.title.trim(), note: F.note.trim() || null }).select().single());
+    S.schedule.push(row); S.sched = { time: '', title: '', note: '' }; render();
+  },
+  async schedDel(el) {
+    const id = Number(el.dataset.id);
+    if (!confirm('Diesen Punkt löschen?')) return;
+    await q(sb.from('stage_schedule').delete().eq('id', id));
+    S.schedule = S.schedule.filter((x) => x.id !== id); render();
+  },
   lightbox(el) { S.lightbox = S.photoUrls[el.dataset.path] || null; render(); },
   closeLightbox() { S.lightbox = null; render(); },
   async photoDel(el) {
@@ -828,6 +876,9 @@ const inputs = {
   loginCode: (v) => { S.login.code = v; },
   guestName: (v) => { S.guestName = v; },
   kTitle: (v) => { S.kasse.title = v; },
+  schedTime: (v) => { S.sched.time = v; },
+  schedTitle: (v) => { S.sched.title = v; },
+  schedNote: (v) => { S.sched.note = v; },
   kAmount: (v) => { S.kasse.amount = v; }
 };
 
