@@ -24,6 +24,10 @@ const S = {
   leaderboard: [],
   rsvps: [],
   slots: [],
+  photos: [],
+  photoUrls: {},
+  lightbox: null,
+  uploading: '',
   packing: {},
   expenses: [],
   shares: [],
@@ -59,10 +63,11 @@ async function q(promise) {
 
 // ---------------------------------------------------------------- Laden
 async function loadAll() {
-  const [members, tours, organizers, stages, reveals, revealContents, riddles, solutions, slots] = await Promise.all([
+  const [members, tours, organizers, photos, stages, reveals, revealContents, riddles, solutions, slots] = await Promise.all([
     q(sb.from('members').select('*').order('nickname')),
     q(sb.from('tours').select('*').order('year', { ascending: false })),
     q(sb.from('tour_organizers').select('*')),
+    q(sb.from('tour_photos').select('*').order('sort').order('id')),
     q(sb.from('stages').select('*').order('sort')),
     q(sb.from('reveals').select('*').order('reveal_at')),
     q(sb.from('reveal_contents').select('*')),
@@ -71,7 +76,7 @@ async function loadAll() {
     q(sb.from('orga_slots').select('*'))
   ]);
   S.members = members; S.tours = tours; S.organizers = organizers; S.stages = stages;
-  S.reveals = reveals; S.riddles = riddles; S.slots = slots;
+  S.reveals = reveals; S.riddles = riddles; S.slots = slots; S.photos = photos;
   S.revealContents = Object.fromEntries(revealContents.map((r) => [r.reveal_id, r]));
   S.solutions = Object.fromEntries(solutions.map((s) => [s.riddle_id, s]));
   S.tour = tours.find((t) => t.year === TOUR_YEAR) || null;
@@ -89,6 +94,15 @@ async function loadAll() {
   S.leaderboard = leaderboard; S.rsvps = rsvps;
   S.packing = Object.fromEntries(packing.map((p) => [p.item_key, p.checked]));
   S.expenses = expenses; S.shares = shares;
+  await refreshPhotoUrls();
+}
+
+async function refreshPhotoUrls() {
+  const paths = S.photos.map((p) => p.storage_path).filter((p) => !S.photoUrls[p]);
+  if (!paths.length) return;
+  const { data, error } = await sb.storage.from('tour-photos').createSignedUrls(paths, 60 * 60 * 6);
+  if (error) { console.error(error); return; }
+  (data || []).forEach((d) => { if (d.signedUrl) S.photoUrls[d.path] = d.signedUrl; });
 }
 
 async function afterLogin() {
@@ -251,10 +265,10 @@ function viewStart() {
     ${viewNotifCard()}
 
     ${rv.finished ? `
-      <div class="card dark"><span class="label">Reveals</span><p class="title">Alles enthüllt. Ab nach Mallorca!</p></div>
+      <div class="card dark"><span class="label">Enthüllungen</span><p class="title">Alles enthüllt. Ab nach Mallorca!</p></div>
     ` : `
       <div class="card dark">
-        <span class="label">Nächstes Reveal · ${Math.min(rv.done + 1, rv.total)} von ${rv.total}</span>
+        <span class="label">Nächste Enthüllung · ${Math.min(rv.done + 1, rv.total)} von ${rv.total}</span>
         <p class="title">${esc(rv.next.teaser)}</p>
         <div class="count4" id="revealCount">${countHtml(rv.next.reveal_at)}</div>
         <div class="bars">${Array.from({ length: rv.total }, (_, i) => `<i class="${i < rv.done ? 'on' : ''}" style="${i === rv.done ? 'background:#fff' : ''}"></i>`).join('')}</div>
@@ -271,10 +285,10 @@ function viewStart() {
     <div class="card">
       <span class="label">Teilnahme ${TOUR_YEAR}</span>
       <p class="title">Bist du auf Mallorca dabei?</p>
-      <div class="seg3">
-        ${['ja', 'vielleicht', 'nein'].map((s) => `<button class="opt center ${myStatus === s ? (s === 'ja' ? 'on' : s === 'vielleicht' ? 'on-maybe' : 'on-no') : ''}" data-action="rsvp" data-status="${s}">${s === 'ja' ? 'Dabei' : s === 'vielleicht' ? 'Vielleicht' : 'Nein'}</button>`).join('')}
+      <div class="seg" style="grid-template-columns:1fr 1fr;background:none;padding:0;gap:8px">
+        ${['ja', 'nein'].map((s) => `<button class="opt center ${myStatus === s ? (s === 'ja' ? 'on' : 'on-no') : ''}" data-action="rsvp" data-status="${s}">${s === 'ja' ? 'Ja, ich bin dabei' : 'Nein'}</button>`).join('')}
       </div>
-      <p class="muted small">${cnt.ja} dabei · ${cnt.vielleicht} vielleicht · ${cnt.nein} nicht dabei · ${cnt.offen} offen</p>
+      <p class="muted small">${cnt.ja} dabei · ${cnt.nein} nicht dabei · ${cnt.offen} offen</p>
       <button class="btn ghost" data-action="open" data-overlay="teil">Wer ist dabei?</button>
     </div>
 
@@ -299,14 +313,14 @@ function viewNotifCard() {
   const ios = /iphone|ipad|ipod/i.test(navigator.userAgent);
   if (!('Notification' in window)) {
     if (ios && !standalone) {
-      return `<div class="card alert"><span class="label">Kein Reveal verpassen</span>
+      return `<div class="card alert"><span class="label">Keine Enthüllung verpassen</span>
         <p class="muted">Leg die App auf deinen Home-Bildschirm: unten auf <b>Teilen</b> tippen, dann <b>„Zum Home-Bildschirm“</b>. Öffne sie danach von dort, dann kannst du Mitteilungen erlauben.</p></div>`;
     }
     return '';
   }
   if (Notification.permission !== 'default') return '';
-  return `<div class="card alert"><span class="label">Kein Reveal verpassen</span>
-    <p class="muted">Wir sagen Bescheid, wenn ein Reveal oder ein neues Rätsel kommt. Sonst nichts, versprochen.</p>
+  return `<div class="card alert"><span class="label">Keine Enthüllung verpassen</span>
+    <p class="muted">Wir sagen Bescheid, wenn etwas enthüllt wird oder ein neues Rätsel kommt. Sonst nichts, versprochen.</p>
     <button class="btn block" data-action="allowNotif">Mitteilungen erlauben</button></div>`;
 }
 
@@ -393,7 +407,10 @@ function viewOrga() {
     <div class="list" style="gap:8px">
       ${S.tours.map((t) => {
         const org = S.organizers.filter((o) => o.tour_id === t.id).map((o) => nick(o.member_id)).join(' & ');
+        const cover = S.photos.find((p) => p.tour_id === t.id);
+        const curl = cover && S.photoUrls[cover.storage_path];
         return `<button class="yearbtn ${t.year === TOUR_YEAR ? 'current' : ''}" data-action="openYear" data-year="${t.year}">
+          ${curl ? `<img src="${esc(curl)}" alt="" style="width:52px;height:52px;border-radius:10px;object-fit:cover;flex:none">` : ''}
           <span class="yr">${t.year}</span>
           <span class="grow" style="display:flex;flex-direction:column;gap:2px"><b>${esc(t.title)}</b><span class="muted small">${esc(org)}${t.region ? ' · ' + esc(t.region) : ''}</span></span>
         </button>`;
@@ -424,7 +441,7 @@ function viewOlympia() {
     <h2 style="font-size:30px">Pool-Olympiade</h2>
     <div class="card" style="background:#8A5A12;color:#fff"><p class="title">Der goldene Wanderschuh</p><p style="margin:0;font-size:14px;line-height:1.4">Ein echter alter Wanderschuh, vergoldet. Wird jedes Jahr weitergegeben.</p></div>
     <div class="card"><span class="label">Der Fahrplan</span><div class="list">
-      <div class="row"><span class="daybox">06</span><div class="grow"><b>Juni: Disziplinen-Reveal</b><span class="muted small">01.06.2027 um 20:00 Uhr</span></div></div>
+      <div class="row"><span class="daybox">06</span><div class="grow"><b>Juni: Enthüllung der Disziplinen</b><span class="muted small">01.06.2027 um 20:00 Uhr</span></div></div>
       <div class="row"><span class="daybox">07</span><div class="grow"><b>Sommer: Qualifikation</b><span class="muted small">In Ralles Pool auf der Amöneburg</span></div></div>
       <div class="row"><span class="daybox" style="background:var(--accent)">09</span><div class="grow"><b>Finale auf Mallorca</b><span class="muted small">Siegerehrung beim Jubiläumsessen</span></div></div>
     </div></div>
@@ -479,7 +496,7 @@ function viewTeil() {
   S.members.forEach((m) => { cnt[rsvpOf(m.id)]++; });
   return overlayShell(`Teilnehmer · Mallorca ${TOUR_YEAR}`, `
     <h2 style="font-size:28px">Wer ist dabei?</h2>
-    <p class="muted">${cnt.ja} dabei · ${cnt.vielleicht} vielleicht · ${cnt.nein} nicht dabei · ${cnt.offen} offen</p>
+    <p class="muted">${cnt.ja} dabei · ${cnt.nein} nicht dabei · ${cnt.offen} offen</p>
     <div class="card" style="gap:0"><div class="list">
       ${S.members.map((m) => {
         const st = rsvpOf(m.id);
@@ -550,7 +567,21 @@ function viewYear(year) {
     ${st.length ? `<div class="card"><span class="label">Die Etappen</span><div class="list">
       ${st.map((s) => `<div class="row"><span class="daybox">${esc(s.day_label)}</span><div class="grow"><b>${esc(s.title)}</b><span class="muted small">${esc(s.meta || '')}</span></div></div>`).join('')}
     </div></div>` : ''}
+    ${viewPhotos(t)}
     ${t.summary ? `<div class="card"><span class="label">Was hängen blieb</span><p style="margin:0;line-height:1.5">${esc(t.summary)}</p></div>` : ''}`);
+}
+
+function viewPhotos(t) {
+  const ph = S.photos.filter((p) => p.tour_id === t.id);
+  const grid = ph.length ? `<div class="photogrid">${ph.map((p) => {
+    const url = S.photoUrls[p.storage_path];
+    return `<div class="ph">${url ? `<button class="phbtn" data-action="lightbox" data-path="${esc(p.storage_path)}" aria-label="Foto vergrößern"><img src="${esc(url)}" alt="${esc(p.caption || 'Foto ' + t.year)}" loading="lazy"></button>` : '<div class="phph"></div>'}
+      ${isAdmin() ? `<button class="phdel" data-action="photoDel" data-id="${p.id}" aria-label="Foto löschen">×</button>` : ''}</div>`;
+  }).join('')}</div>` : `<p class="muted">Noch keine Fotos.${isAdmin() ? '' : ' Ralle lädt sie nach und nach hoch.'}</p>`;
+  return `<div class="card"><span class="label">Fotos${ph.length ? ' · ' + ph.length : ''}</span>${grid}
+    ${isAdmin() ? `<label class="btn" style="display:flex;align-items:center;justify-content:center;cursor:pointer">${S.uploading ? esc(S.uploading) : 'Fotos hinzufügen'}
+      <input type="file" accept="image/*" multiple data-upload="${t.id}" data-year="${t.year}" style="display:none" ${S.uploading ? 'disabled' : ''}></label>
+      <p class="muted small">Die Fotos werden vor dem Hochladen verkleinert. Sehen können sie nur eingetragene Mitglieder.</p>` : ''}</div>`;
 }
 
 // ---------------------------------------------------------------- Gesamtansicht
@@ -571,6 +602,7 @@ function render() {
   else if (S.overlay === 'teil') ov = viewTeil();
   else if (S.overlay === 'kasse') ov = viewKasse();
   else if (S.overlay && S.overlay.year) ov = viewYear(S.overlay.year);
+  if (S.lightbox) ov += `<div class="lightbox" data-action="closeLightbox"><img src="${esc(S.lightbox)}" alt="Foto"><button class="close" aria-label="Schließen">×</button></div>`;
   app.innerHTML = `<main class="main">${body}</main>
     <nav class="nav" aria-label="Hauptnavigation"><div class="nav-inner">
       ${TABS.map(([k, l]) => `<button class="${S.tab === k ? 'on' : ''}" data-action="tab" data-tab="${k}">${ICONS[k]}<span>${l}</span></button>`).join('')}
@@ -591,15 +623,25 @@ const actions = {
   open(el) { S.overlay = el.dataset.overlay; S.kasse.forIds = null; render(); },
   openYear(el) { S.overlay = { year: Number(el.dataset.year) }; render(); },
   close() { S.overlay = null; render(); },
+  lightbox(el) { S.lightbox = S.photoUrls[el.dataset.path] || null; render(); },
+  closeLightbox() { S.lightbox = null; render(); },
+  async photoDel(el) {
+    const id = Number(el.dataset.id);
+    const p = S.photos.find((x) => x.id === id);
+    if (!p || !confirm('Dieses Foto löschen?')) return;
+    await q(sb.storage.from('tour-photos').remove([p.storage_path]));
+    await q(sb.from('tour_photos').delete().eq('id', id));
+    S.photos = S.photos.filter((x) => x.id !== id); render();
+  },
 
   async allowNotif() {
     try { await Notification.requestPermission(); } catch (e) { /* ignorieren */ }
-    toast(Notification.permission === 'granted' ? 'Mitteilungen sind an. Bis zum nächsten Reveal!' : 'Kein Problem. Du kannst Mitteilungen später in den Einstellungen erlauben.');
+    toast(Notification.permission === 'granted' ? 'Mitteilungen sind an. Bis zur nächsten Enthüllung!' : 'Kein Problem. Du kannst Mitteilungen später in den Einstellungen erlauben.');
   },
 
   async rsvp(el) { await setRsvp(S.me.id, el.dataset.status); },
   async cycleRsvp(el) {
-    const order = ['offen', 'ja', 'vielleicht', 'nein'];
+    const order = ['offen', 'ja', 'nein'];
     const id = el.dataset.member;
     const next = order[(order.indexOf(rsvpOf(id)) + 1) % order.length];
     if (next === 'offen') {
@@ -718,6 +760,46 @@ app.addEventListener('click', (ev) => {
   const fn = actions[el.dataset.action];
   if (fn) { ev.preventDefault(); Promise.resolve(fn(el)).catch((e) => console.error(e)); }
 });
+function resizeImage(file, max = 1600, quality = 0.82) {
+  return new Promise((resolve, reject) => {
+    const url = URL.createObjectURL(file);
+    const img = new Image();
+    img.onload = () => {
+      const scale = Math.min(1, max / Math.max(img.naturalWidth, img.naturalHeight));
+      const c = document.createElement('canvas');
+      c.width = Math.round(img.naturalWidth * scale); c.height = Math.round(img.naturalHeight * scale);
+      c.getContext('2d').drawImage(img, 0, 0, c.width, c.height);
+      URL.revokeObjectURL(url);
+      c.toBlob((b) => (b ? resolve(b) : reject(new Error('Bild konnte nicht verarbeitet werden'))), 'image/jpeg', quality);
+    };
+    img.onerror = () => { URL.revokeObjectURL(url); reject(new Error('Bild konnte nicht gelesen werden')); };
+    img.src = url;
+  });
+}
+
+app.addEventListener('change', async (ev) => {
+  const el = ev.target.closest('[data-upload]');
+  if (!el || !el.files?.length) return;
+  const tourId = Number(el.dataset.upload), year = el.dataset.year;
+  const files = [...el.files];
+  let sort = S.photos.filter((p) => p.tour_id === tourId).length;
+  let ok = 0;
+  for (let i = 0; i < files.length; i++) {
+    S.uploading = `Lade hoch … ${i + 1} von ${files.length}`; render();
+    try {
+      const blob = await resizeImage(files[i]);
+      const path = `${year}/${Date.now()}-${Math.random().toString(36).slice(2, 8)}.jpg`;
+      const up = await sb.storage.from('tour-photos').upload(path, blob, { contentType: 'image/jpeg', upsert: false });
+      if (up.error) throw up.error;
+      const row = await q(sb.from('tour_photos').insert({ tour_id: tourId, storage_path: path, sort: sort++ }).select().single());
+      S.photos.push(row); ok++;
+    } catch (e) { console.error(e); toast('Ein Foto ging nicht: ' + (e.message || e)); }
+  }
+  await refreshPhotoUrls();
+  S.uploading = ''; render();
+  toast(`${ok} ${ok === 1 ? 'Foto' : 'Fotos'} hochgeladen.`);
+});
+
 app.addEventListener('input', (ev) => {
   const el = ev.target.closest('[data-input]');
   if (el && inputs[el.dataset.input]) inputs[el.dataset.input](el.value);
