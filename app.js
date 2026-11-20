@@ -209,6 +209,13 @@ function revealState() {
   return { finished: false, next: nx, done, total: real.length, latest, afterJoke };
 }
 
+function calendarDaysUntil(isoDate) {
+  const [y, m, d] = isoDate.split('-').map(Number);
+  const n = new Date();
+  const todayUtc = Date.UTC(n.getFullYear(), n.getMonth(), n.getDate());
+  return Math.max(0, Math.round((Date.UTC(y, m - 1, d) - todayUtc) / 86400000));
+}
+
 function splitCountdown(target) {
   const s = Math.max(0, Math.floor((new Date(target).getTime() - now()) / 1000));
   return { d: Math.floor(s / 86400), h: pad(Math.floor((s % 86400) / 3600)), m: pad(Math.floor((s % 3600) / 60)), s: pad(s % 60) };
@@ -260,7 +267,7 @@ function kasseCalc() {
 // ---------------------------------------------------------------- Ansichten: Start
 function viewStart() {
   const t = S.tour;
-  const daysLeft = t ? Math.max(0, Math.ceil((new Date(t.date_from + 'T00:00:00').getTime() - now()) / 86400000)) : '–';
+  const daysLeft = t ? calendarDaysUntil(t.date_from) : '–';
   const past = S.tours.filter((x) => x.year < TOUR_YEAR).length;
   const rv = revealState();
   const myStatus = rsvpOf(S.me.id);
@@ -488,7 +495,7 @@ function viewQuiz() {
   return `
     <div class="card dark"><span class="label">Wer weiß denn sowas? · Der Rätselsteig</span>
       <p class="title">${resolved ? `Stand nach Etappe ${resolved} von ${S.riddles.length || 20}` : 'Noch keine Etappe aufgelöst'}</p>
-      <p class="muted">Wird nach jeder Auflösung alle 14 Tage aktualisiert. Platz 1 hat auf Mallorca das erste Zimmerwahlrecht, Platz 1–3 bekommen einen Bonus in der Pool-Olympiade.</p>
+      <p class="muted">Wird nach jeder Auflösung alle 14 Tage aktualisiert. Platz 1 hat auf Mallorca das erste Zimmerwahlrecht, Platz 1–3 bekommen einen Bonus in der Jubiläums-Olympiade.</p>
     </div>
     <div class="card"><div class="list">${rows || '<p class="muted">Noch keine Punkte.</p>'}</div></div>
     <p class="muted small">${esc(S.members.filter((m) => m.is_quizmaster).map((m) => m.nickname).join(', '))} schreibt die Rätsel und spielt außer Konkurrenz.</p>`;
@@ -498,14 +505,23 @@ function viewQuiz() {
 function viewOlympia() {
   const unlock = new Date('2027-06-01T20:00:00+02:00').getTime() <= now();
   return `<div class="pad">
-    <h2 style="font-size:30px">Pool-Olympiade</h2>
-    <div class="card" style="background:#8A5A12;color:#fff"><p class="title">Der goldene Wanderschuh</p><p style="margin:0;font-size:14px;line-height:1.4">Ein echter alter Wanderschuh, vergoldet. Wird jedes Jahr weitergegeben.</p></div>
+    <h2 style="font-size:30px">Jubiläums-Olympiade</h2>
+    <p class="muted">2027 auf Mallorca · die nächste gibt es erst zu 20 Jahren Wanderclub, 2037.</p>
+    <div class="card" style="background:#8A5A12;color:#fff">
+      <span class="label" style="color:#FFE2B8">Der Preis</span>
+      <p class="title">Die goldene Wandermütze</p>
+      <p style="margin:0;font-size:14px;line-height:1.45">Wird nur zum Jubiläum vergeben: 2027 und wieder 2037. Bis dahin wandert sie mit, denn der Träger muss sie auf jeder Tour dabeihaben.</p>
+    </div>
+    <div class="card"><span class="label">Die Regeln der Mütze</span><div class="list">
+      <div class="row"><span class="daybox">1</span><div class="grow"><b>Die Mütze fehlt auf keiner Tour.</b><span class="muted small">Ist der Träger verhindert, übergibt er sie vorher an einen Stellvertreter. Fehlt sie trotzdem, zahlt er die erste Runde.</span></div></div>
+      <div class="row"><span class="daybox">2</span><div class="grow"><b>Tragepflicht beim Gipfelfoto.</b><span class="muted small">Jedes Jahr ein Mützenfoto – bis 2037 wird daraus eine eigene Galerie.</span></div></div>
+    </div></div>
     <div class="card"><span class="label">Der Fahrplan</span><div class="list">
       <div class="row"><span class="daybox">06</span><div class="grow"><b>Juni: Enthüllung der Disziplinen</b><span class="muted small">01.06.2027 um 20:00 Uhr</span></div></div>
       <div class="row"><span class="daybox">07</span><div class="grow"><b>Sommer: Qualifikation</b><span class="muted small">In Ralles Pool auf der Amöneburg</span></div></div>
       <div class="row"><span class="daybox" style="background:var(--accent)">09</span><div class="grow"><b>Finale auf Mallorca</b><span class="muted small">Siegerehrung beim Jubiläumsessen</span></div></div>
     </div></div>
-    ${unlock ? '' : `<div class="card pine"><span class="label">Noch geheim</span><p class="title">Die Disziplinen werden am 01.06.2027 enthüllt.</p><p class="muted">Bis dahin: schwimmen üben, Arschbombe perfektionieren.</p></div>`}
+    ${unlock ? '' : `<div class="card pine"><span class="label">Noch geheim</span><p class="title">Die Disziplinen werden am 01.06.2027 enthüllt.</p><p class="muted">Bis dahin: Tischtennisschläger suchen, Arschbombe perfektionieren.</p></div>`}
     <div class="card"><span class="label">Startvorteile aus der Rätselwertung</span>
       <p style="margin:0;font-size:14px"><b>Platz 1:</b> bestimmt eine Zusatzdisziplin.</p>
       <p style="margin:0;font-size:14px"><b>Platz 2 und 3:</b> je ein Joker, um eine Disziplin zu wiederholen.</p>
@@ -529,7 +545,7 @@ const PACK = [
   ['SEIT 2019 UNGEKLÄRT', [['seil', 'Seil (Stürmi: „Wofür war nochmal das Seil?“)'], ['angel', 'Angelhaken'], ['kabel', 'Kabelbinder'], ['wanderkarte', 'Wanderkarte']]],
   ['NEU · ZU WASSER', [['badehose', 'Badehose (Ossi 2019: „Hosen brauchen wir ja nicht“)'], ['handtuch', 'Handtuch'], ['badeschuhe', 'Badeschuhe für die felsigen Buchten'], ['sonne', 'Sonnencreme']]],
   ['NEU · IN DER LUFT', [['ausweis', 'Personalausweis'], ['bordkarte', 'Bordkarte aufs Handy'], ['powerbank', 'Powerbank (ins Handgepäck)'], ['karte', 'Krankenversicherungskarte']]],
-  ['NEU · TRADITION', [['schnaps', 'Starterschnaps'], ['witze', 'Neue Witze (Ralle)'], ['pool', 'Form für die Pool-Olympiade']]]
+  ['NEU · TRADITION', [['schnaps', 'Starterschnaps'], ['witze', 'Neue Witze (Ralle)'], ['pool', 'Form für die Jubiläums-Olympiade']]]
 ];
 const PACK_TOTAL = PACK.reduce((a, g) => a + g[1].length, 0);
 const packDoneCount = () => PACK.reduce((a, g) => a + g[1].filter(([k]) => S.packing[k]).length, 0);
