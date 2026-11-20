@@ -94,7 +94,26 @@ async function loadAll() {
   S.leaderboard = leaderboard; S.rsvps = rsvps;
   S.packing = Object.fromEntries(packing.map((p) => [p.item_key, p.checked]));
   S.expenses = expenses; S.shares = shares;
+  await loadRiddleExtras();
   await refreshPhotoUrls();
+}
+
+async function loadRiddleExtras() {
+  const cr = currentRiddle(), lr = lastResolvedRiddle();
+  S.riddleCount = cr ? await q(sb.rpc('riddle_answer_count', { rid: cr.id })) : 0;
+  S.lastRight = [];
+  if (lr && S.solutions[lr.id]) {
+    const sol = S.solutions[lr.id];
+    const ans = await q(sb.from('riddle_answers').select('*').eq('riddle_id', lr.id));
+    if (lr.kind === 'schaetzen') {
+      const withVal = ans.filter((a) => a.numeric_value !== null);
+      const best = Math.min(...withVal.map((a) => Math.abs(a.numeric_value - sol.numeric_answer)));
+      S.lastRight = withVal.filter((a) => Math.abs(a.numeric_value - sol.numeric_answer) === best)
+        .map((a) => `${nick(a.member_id)} (${Number(a.numeric_value).toLocaleString('de-DE')})`);
+    } else {
+      S.lastRight = ans.filter((a) => a.option_index === sol.correct_option).map((a) => nick(a.member_id));
+    }
+  }
 }
 
 async function refreshPhotoUrls() {
@@ -264,6 +283,8 @@ function viewStart() {
   <div class="pad">
     ${viewNotifCard()}
 
+    ${viewRiddleCard(cr, lr, firstRiddle)}
+
     ${rv.finished ? `
       <div class="card dark"><span class="label">Enthüllungen</span><p class="title">Alles enthüllt. Ab nach Mallorca!</p></div>
     ` : `
@@ -292,8 +313,6 @@ function viewStart() {
       <p class="muted small">${cnt.ja} dabei · ${cnt.nein} nicht dabei · ${cnt.offen} offen</p>
       <button class="btn ghost" data-action="open" data-overlay="teil">Wer ist dabei?</button>
     </div>
-
-    ${viewRiddleCard(cr, lr, firstRiddle)}
 
     <div class="tiles">
       <button class="tile" data-action="open" data-overlay="kasse"><b>Kasse</b><span>Wer schuldet wem</span></button>
@@ -326,30 +345,60 @@ function viewNotifCard() {
 }
 
 function viewRiddleCard(cr, lr, first) {
-  let html = '<div class="card"><span class="label">Rätsel · alle 14 Tage</span>';
+  const players = S.members.filter((m) => !m.is_guest && !m.is_quizmaster).length;
+  const meQuiz = !!S.me.is_quizmaster;
+  const lb = S.leaderboard.find((r) => r.member_id === S.me.id);
+  let myRank = null;
+  if (lb) { const better = S.leaderboard.filter((r) => r.points > lb.points).length; myRank = better + 1; }
+  let html = '<div class="card riddle">';
+
   if (cr) {
     const mine = S.myAnswers[cr.id];
-    html += `<p class="title">#${cr.nr}: ${esc(cr.question)}</p>`;
-    if (cr.kind === 'schaetzen') {
-      html += `<label class="field">Deine Schätzung
+    html += `<div class="riddle-top"><span class="label">Rätsel #${cr.nr} von ${S.riddles.length}</span>
+      <span class="rchip">${cr.kind === 'schaetzen' ? 'Schätzfrage · ' + cr.points + ' Punkte' : cr.kind === 'mallorca' ? 'Mallorca' : 'Aus dem Archiv'}</span></div>
+      <p class="rq">${esc(cr.question)}</p>`;
+    if (meQuiz) {
+      const sol = S.solutions[cr.id];
+      const right = sol ? (cr.kind === 'schaetzen' ? Number(sol.numeric_answer).toLocaleString('de-DE') : (cr.options || [])[sol.correct_option]) : '–';
+      html += `<div class="rstamp">Du bist Rätselmeister und spielst außer Konkurrenz. Lösung: <b>${esc(right)}</b></div>`;
+    } else if (cr.kind === 'schaetzen') {
+      html += `<label class="field" style="color:#fff">Deine Schätzung
         <input inputmode="numeric" data-input="estimate" data-riddle="${cr.id}" value="${esc(mine?.numeric_value ?? '')}" placeholder="Zahl eingeben"></label>
-        <button class="btn" data-action="saveEstimate" data-riddle="${cr.id}">${mine ? 'Schätzung ändern' : 'Schätzung abgeben'}</button>`;
+        <button class="btn light" data-action="saveEstimate" data-riddle="${cr.id}">${mine ? 'Schätzung ändern' : 'Schätzung abgeben'}</button>`;
     } else {
-      html += (cr.options || []).map((o, i) => `<button class="opt ${mine?.option_index === i ? 'on' : ''}" data-action="answer" data-riddle="${cr.id}" data-idx="${i}">${esc(o)}</button>`).join('');
+      html += `<div class="ropts">${(cr.options || []).map((o, i) => `<button class="ropt ${mine?.option_index === i ? 'on' : ''}" data-action="answer" data-riddle="${cr.id}" data-idx="${i}"><span class="rletter">${'ABCD'[i] || i + 1}</span>${esc(o)}</button>`).join('')}</div>`;
     }
-    html += `<p class="muted small">${mine ? 'Antwort gespeichert, du kannst sie bis zur Auflösung ändern. ' : ''}Auflösung am ${fmtDateTime(cr.resolve_at)}.</p>`;
+    if (mine && !meQuiz) html += `<div class="rstamp">✓ Dein Tipp ist drin. Ändern geht bis zur Auflösung.</div>`;
+    html += `<div class="rmeta"><span>Auflösung in</span><b id="riddleCount" data-target="${esc(cr.resolve_at)}">${shortCount(cr.resolve_at)}</b></div>
+      <div class="rbar"><i style="width:${players ? Math.round(Math.min(S.riddleCount, players) / players * 100) : 0}%"></i></div>
+      <p class="rsmall">${S.riddleCount} von ${players} haben getippt${!meQuiz && !mine ? ' · du fehlst noch!' : ''}${myRank && !meQuiz ? ` · Du bist aktuell auf Platz ${myRank}` : ''}</p>`;
   } else if (first && new Date(first.publish_at).getTime() > now()) {
-    html += `<p class="title">Das erste Rätsel kommt am ${fmtDateTime(first.publish_at)}.</p><p class="muted">Danach alle 14 Tage ein neues. Wer am Ende vorne liegt, hat auf Mallorca das erste Zimmerwahlrecht.</p>`;
+    html += `<div class="riddle-top"><span class="label">Das große Rätsel</span><span class="rchip">20 Runden</span></div>
+      <p class="rq">Das erste Rätsel startet in</p>
+      <div class="count4 rcount" id="riddleStart" data-target="${esc(first.publish_at)}">${countHtml(first.publish_at)}</div>
+      <p class="rsmall">Ab ${fmtDateTime(first.publish_at)} alle 14 Tage ein neues Rätsel. Wer am Ende vorne liegt, sucht sich auf Mallorca als Erster sein Zimmer aus.</p>`;
   } else {
-    html += `<p class="title">Alle Rätsel sind gelöst.</p>`;
+    html += `<span class="label">Rätsel</span><p class="rq">Alle 20 Rätsel sind gelöst.</p>`;
   }
+
   if (lr && S.solutions[lr.id]) {
     const sol = S.solutions[lr.id];
     const right = lr.kind === 'schaetzen' ? Number(sol.numeric_answer).toLocaleString('de-DE') : (lr.options || [])[sol.correct_option];
-    html += `<div class="okmsg"><b>Auflösung #${lr.nr}:</b> ${esc(right)}. ${esc(sol.explanation || '')}</div>`;
+    const mineLast = S.myAnswers[lr.id];
+    const iWasRight = mineLast && (lr.kind === 'schaetzen' ? S.lastRight.some((x) => x.startsWith(S.me.nickname + ' ')) : mineLast.option_index === sol.correct_option);
+    html += `<div class="rsolve"><span class="label" style="color:var(--accent)">Auflösung #${lr.nr}</span>
+      <p style="margin:0;font-weight:800;font-size:17px">${esc(right)}</p>
+      <p class="muted small" style="margin:0">${esc(sol.explanation || '')}</p>
+      <p style="margin:0;font-size:14px"><b>${lr.kind === 'schaetzen' ? 'Am nächsten dran' : 'Richtig lagen'}:</b> ${S.lastRight.length ? esc(S.lastRight.join(', ')) : 'niemand. Peinlich.'}</p>
+      ${mineLast && !meQuiz ? `<p style="margin:0;font-size:14px;font-weight:700;color:${iWasRight ? 'var(--ok)' : 'var(--accent-dark)'}">${iWasRight ? 'Du auch. Stark!' : 'Du leider nicht.'}</p>` : ''}</div>`;
   }
-  html += `<button class="btn ghost" data-action="goQuizRank">Rätsel-Rangliste ansehen</button></div>`;
+  html += `<button class="btn ghost rlink" data-action="goQuizRank">Zur Rätsel-Rangliste</button></div>`;
   return html;
+}
+
+function shortCount(target) {
+  const c = splitCountdown(target);
+  return c.d > 0 ? `${c.d} T ${c.h}:${c.m}:${c.s}` : `${c.h}:${c.m}:${c.s}`;
 }
 
 // ---------------------------------------------------------------- Ansichten: Etappen
@@ -815,8 +864,16 @@ app.addEventListener('keydown', (ev) => {
 
 // Sekunden-Countdown, ohne die ganze Seite neu aufzubauen
 setInterval(() => {
+  if (!S.me) return;
+  const rc = document.getElementById('riddleCount');
+  const rs = document.getElementById('riddleStart');
+  for (const [el, fmt] of [[rc, shortCount], [rs, countHtml]]) {
+    if (!el) continue;
+    if (new Date(el.dataset.target).getTime() <= now()) { loadAll().then(render); return; }
+    el.innerHTML = fmt(el.dataset.target);
+  }
   const box = document.getElementById('revealCount');
-  if (!box || !S.me) return;
+  if (!box) return;
   const rv = revealState();
   if (rv.finished || (rv.next && new Date(rv.next.reveal_at).getTime() <= now())) { loadAll().then(render); return; }
   box.innerHTML = countHtml(rv.next.reveal_at);

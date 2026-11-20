@@ -160,3 +160,27 @@ h1, h2, h3 { font-family: Archivo, sans-serif; font-weight: 900; margin: 0; line
 .yn.yes.on { background: var(--pine); color: #fff; }
 .yn.no { border-color: var(--accent-dark); color: var(--accent-dark); }
 .yn.no.on { background: var(--accent-dark); color: #fff; }
+
+/* Rätsel-Karte */
+.card.riddle { background: var(--accent); color: #fff; box-shadow: 0 6px 18px rgba(194,65,12,.25); }
+.card.riddle .label { color: #FFE2CF; }
+.riddle-top { display: flex; justify-content: space-between; align-items: center; gap: 8px; }
+.rchip { font-size: 11px; font-weight: 700; background: rgba(255,255,255,.18); color: #fff; padding: 5px 9px; border-radius: 999px; white-space: nowrap; }
+.rq { margin: 0; font-family: Archivo, sans-serif; font-weight: 900; font-size: 24px; line-height: 1.15; }
+.ropts { display: flex; flex-direction: column; gap: 8px; }
+.ropt { min-height: 50px; border-radius: 14px; border: 2px solid #fff; background: #fff; color: var(--ink); font-weight: 700; font-size: 15px; text-align: left; padding: 8px 12px; display: flex; align-items: center; gap: 12px; cursor: pointer; }
+.ropt.on { background: var(--pine); border-color: var(--pine); color: #fff; }
+.rletter { flex: none; width: 28px; height: 28px; border-radius: 8px; background: var(--sand); color: #8A2E07; display: flex; align-items: center; justify-content: center; font-weight: 900; }
+.ropt.on .rletter { background: #fff; color: var(--pine); }
+.rstamp { background: rgba(255,255,255,.16); border-radius: 12px; padding: 10px 12px; font-size: 14px; font-weight: 600; line-height: 1.4; }
+.rmeta { display: flex; justify-content: space-between; align-items: baseline; gap: 8px; font-size: 14px; font-weight: 600; }
+.rmeta b { font-family: Archivo, sans-serif; font-weight: 900; font-size: 26px; font-variant-numeric: tabular-nums; }
+.rbar { height: 8px; border-radius: 4px; background: rgba(255,255,255,.25); overflow: hidden; }
+.rbar i { display: block; height: 8px; background: #fff; }
+.rsmall { margin: 0; font-size: 13px; line-height: 1.45; color: #FFE2CF; }
+.rcount div { background: rgba(0,0,0,.18); }
+.rcount span { color: #FFE2CF; }
+.rcount .sec b { color: #fff; }
+.rsolve { background: #fff; color: var(--ink); border-radius: 14px; padding: 12px 14px; display: flex; flex-direction: column; gap: 4px; }
+.card.riddle .rlink { color: #fff; }
+.card.riddle .btn.light { color: var(--accent-dark); }
