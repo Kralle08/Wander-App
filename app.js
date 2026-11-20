@@ -32,7 +32,7 @@ const S = {
   expenses: [],
   shares: [],
   tab: 'start',
-  rankSeg: 'orga',
+  rankSeg: 'quiz',
   overlay: null,       // 'pack' | 'kasse' | 'teil' | {year}
   login: { step: 'email', email: '', code: '', busy: false, error: '' },
   kasse: { title: '', amount: '', paidBy: null, forIds: null, busy: false },
@@ -421,10 +421,10 @@ function viewEtappen() {
 // ---------------------------------------------------------------- Ansichten: Ranking
 function viewRanking() {
   return `<div class="pad">
-    <h2 style="font-size:30px">Hall of Fame</h2>
+    <h2 style="font-size:30px">Ranking</h2>
     <div class="seg">
-      <button class="${S.rankSeg === 'orga' ? 'on' : ''}" data-action="seg" data-seg="orga">Orga & Archiv</button>
       <button class="${S.rankSeg === 'quiz' ? 'on' : ''}" data-action="seg" data-seg="quiz">Rätsel</button>
+      <button class="${S.rankSeg === 'orga' ? 'on' : ''}" data-action="seg" data-seg="orga">Orga</button>
     </div>
     ${S.rankSeg === 'orga' ? viewOrga() : viewQuiz()}
   </div>`;
@@ -454,6 +454,13 @@ function viewOrga() {
       <p style="margin:0;font-size:15px;line-height:1.45">${bilanz}</p>
       ${never.length ? `<p class="muted">Noch nie organisiert: ${esc(never.join(' und '))}. Nur so als Hinweis.</p>` : ''}
     </div>
+`;
+}
+
+function viewArchiv() {
+  return `<div class="pad">
+    <h2 style="font-size:30px">Archiv</h2>
+    <p class="muted">${S.tours.filter((x) => x.year < TOUR_YEAR).length} Touren seit 2018. Antippen für Etappen, Fotos und was hängen blieb.</p>
     <div class="list" style="gap:8px">
       ${S.tours.map((t) => {
         const org = S.organizers.filter((o) => o.tour_id === t.id).map((o) => nick(o.member_id)).join(' & ');
@@ -465,7 +472,8 @@ function viewOrga() {
           <span class="grow" style="display:flex;flex-direction:column;gap:2px"><b>${esc(t.title)}</b><span class="muted small">${esc(org)}${t.region ? ' · ' + esc(t.region) : ''}</span></span>
         </button>`;
       }).join('')}
-    </div>`;
+    </div>
+  </div>`;
 }
 
 function viewQuiz() {
@@ -639,14 +647,15 @@ const ICONS = {
   start: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M3 11l9-7 9 7"/><path d="M5 10v10h14V10"/></svg>',
   etappen: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><circle cx="6" cy="19" r="2"/><circle cx="18" cy="5" r="2"/><path d="M8 19h7a3.5 3.5 0 0 0 0-7H9a3.5 3.5 0 0 1 0-7h7"/></svg>',
   ranking: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M8 4h8v5a4 4 0 0 1-8 0z"/><path d="M8 6H5a3 3 0 0 0 3 4"/><path d="M16 6h3a3 3 0 0 1-3 4"/><path d="M12 13v4"/><path d="M9 20h6"/></svg>',
+  archiv: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="5" rx="1"/><path d="M5 9v10a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1V9"/><path d="M10 13h4"/></svg>',
   olympia: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M2 16c2 0 2-1.5 4-1.5S8 16 10 16s2-1.5 4-1.5 2 1.5 4 1.5 2-1.5 4-1.5"/><path d="M2 20c2 0 2-1.5 4-1.5S8 20 10 20s2-1.5 4-1.5 2 1.5 4 1.5 2-1.5 4-1.5"/><circle cx="15" cy="5" r="2"/><path d="M8 12l3-4 3 2 3-2"/></svg>'
 };
-const TABS = [['start', 'Start'], ['etappen', 'Etappen'], ['ranking', 'Ranking'], ['olympia', 'Olympia']];
+const TABS = [['start', 'Start'], ['etappen', 'Etappen'], ['ranking', 'Ranking'], ['archiv', 'Archiv'], ['olympia', 'Olympia']];
 
 function render() {
   if (!S.session) { app.innerHTML = viewLogin(); return; }
   if (!S.me) { app.innerHTML = viewNotMember(); return; }
-  const body = S.tab === 'start' ? viewStart() : S.tab === 'etappen' ? viewEtappen() : S.tab === 'ranking' ? viewRanking() : viewOlympia();
+  const body = S.tab === 'start' ? viewStart() : S.tab === 'etappen' ? viewEtappen() : S.tab === 'ranking' ? viewRanking() : S.tab === 'archiv' ? viewArchiv() : viewOlympia();
   let ov = '';
   if (S.overlay === 'pack') ov = viewPack();
   else if (S.overlay === 'teil') ov = viewTeil();
