@@ -454,7 +454,7 @@ function viewEtappen() {
     </div></div>
     ${hidden.length ? `<div class="card pine"><span class="label">Noch geheim · ${hidden.length} ${hidden.length === 1 ? 'Etappe' : 'Etappen'}</span>
       <p class="title" style="font-size:24px">Sei nicht so ungeduldig.</p>
-      <p class="muted">Die restlichen Etappen werden enthüllt, wenn es so weit ist. Bis dahin: Wanderschuhe einlaufen und Füße still halten.</p>
+      <p class="muted">Die Etappen werden enthüllt, wenn es so weit ist. Bis dahin: Wanderschuhe einlaufen und Füße still halten.</p>
     </div>` : ''}
   </div>`;
 }
