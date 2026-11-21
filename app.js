@@ -132,11 +132,18 @@ function endPreview() {
 async function loadRiddleExtras() {
   const cr = currentRiddle(), lr = lastResolvedRiddle();
   S.riddleCount = cr ? await q(sb.rpc('riddle_answer_count', { rid: cr.id })) : 0;
-  S.lastRight = [];
+  S.lastRight = []; S.lastAll = []; S.freeAnswers = [];
+  if (cr && cr.kind === 'frei' && isAdmin()) {
+    S.freeAnswers = (await q(sb.from('riddle_answers').select('*').eq('riddle_id', cr.id))).filter((a) => a.text_value);
+  }
   if (lr && S.solutions[lr.id]) {
     const sol = S.solutions[lr.id];
     const ans = await q(sb.from('riddle_answers').select('*').eq('riddle_id', lr.id));
-    if (lr.kind === 'schaetzen') {
+    if (lr.kind === 'frei') {
+      const wins = sol.winner_ids || [];
+      S.lastAll = ans.filter((a) => a.text_value);
+      S.lastRight = S.lastAll.filter((a) => wins.includes(a.member_id)).map((a) => `${nick(a.member_id)}: „${a.text_value}“`);
+    } else if (lr.kind === 'schaetzen') {
       const withVal = ans.filter((a) => a.numeric_value !== null);
       const best = Math.min(...withVal.map((a) => Math.abs(a.numeric_value - sol.numeric_answer)));
       S.lastRight = withVal.filter((a) => Math.abs(a.numeric_value - sol.numeric_answer) === best)
@@ -405,12 +412,19 @@ function viewRiddleCard(cr, lr, first) {
     const mine = S.myAnswers[cr.id];
     html += `<p class="rbrand">Wer weiß denn sowas?</p>
       <div class="riddle-top"><span class="label">Der Rätselsteig · Etappe ${cr.nr} von ${S.riddles.length}</span>
-      <span class="rchip">${cr.kind === 'schaetzen' ? 'Schätzfrage · ' + cr.points + ' Punkte' : cr.kind === 'mallorca' ? 'Mallorca' : 'Aus dem Archiv'}</span></div>
+      <span class="rchip">${cr.kind === 'schaetzen' ? 'Schätzfrage · ' + cr.points + ' Punkte' : cr.kind === 'frei' ? 'Freie Antwort · ' + cr.points + ' Punkte' : cr.kind === 'mallorca' ? 'Mallorca' : 'Aus dem Archiv'}</span></div>
       <p class="rq">${esc(cr.question)}</p>`;
-    if (meQuiz) {
+    if (meQuiz && cr.kind === 'frei') {
+      html += `<div class="rstamp">Du bist Rätselmeister und kürst die beste Antwort. Tippe auf 👑, um jemanden zu küren (auch mehrere möglich).</div>
+        ${freeAnswerList(cr, S.freeAnswers, true)}`;
+    } else if (meQuiz) {
       const sol = S.solutions[cr.id];
       const right = sol ? (cr.kind === 'schaetzen' ? Number(sol.numeric_answer).toLocaleString('de-DE') : (cr.options || [])[sol.correct_option]) : '–';
       html += `<div class="rstamp">Du bist Rätselmeister und spielst außer Konkurrenz. Lösung: <b>${esc(right)}</b></div>`;
+    } else if (cr.kind === 'frei') {
+      html += `<label class="field" style="color:#fff">Deine Erklärung
+        <textarea rows="3" maxlength="300" data-input="freeText" data-riddle="${cr.id}" placeholder="Schreib, was du glaubst – gern auch kreativ">${esc(mine?.text_value ?? '')}</textarea></label>
+        <button class="btn light" data-action="saveFree" data-riddle="${cr.id}">${mine ? 'Antwort ändern' : 'Antwort abgeben'}</button>`;
     } else if (cr.kind === 'schaetzen') {
       html += `<label class="field" style="color:#fff">Deine Schätzung
         <input inputmode="numeric" data-input="estimate" data-riddle="${cr.id}" value="${esc(mine?.numeric_value ?? '')}" placeholder="Zahl eingeben"></label>
@@ -434,17 +448,30 @@ function viewRiddleCard(cr, lr, first) {
 
   if (lr && S.solutions[lr.id]) {
     const sol = S.solutions[lr.id];
-    const right = lr.kind === 'schaetzen' ? Number(sol.numeric_answer).toLocaleString('de-DE') : (lr.options || [])[sol.correct_option];
+    const isFree = lr.kind === 'frei';
+    const right = isFree ? 'Die Auflösung' : lr.kind === 'schaetzen' ? Number(sol.numeric_answer).toLocaleString('de-DE') : (lr.options || [])[sol.correct_option];
     const mineLast = S.myAnswers[lr.id];
-    const iWasRight = mineLast && (lr.kind === 'schaetzen' ? S.lastRight.some((x) => x.startsWith(S.me.nickname + ' ')) : mineLast.option_index === sol.correct_option);
+    const iWasRight = mineLast && (isFree ? (sol.winner_ids || []).includes(S.me.id) : lr.kind === 'schaetzen' ? S.lastRight.some((x) => x.startsWith(S.me.nickname + ' ')) : mineLast.option_index === sol.correct_option);
     html += `<div class="rsolve"><span class="label" style="color:var(--accent)">Auflösung Etappe ${lr.nr}</span>
       <p style="margin:0;font-weight:800;font-size:17px">${esc(right)}</p>
       <p class="muted small" style="margin:0">${esc(sol.explanation || '')}</p>
-      <p style="margin:0;font-size:14px"><b>${lr.kind === 'schaetzen' ? 'Am nächsten dran' : 'Richtig lagen'}:</b> ${S.lastRight.length ? esc(S.lastRight.join(', ')) : 'niemand. Peinlich.'}</p>
-      ${mineLast && !meQuiz ? `<p style="margin:0;font-size:14px;font-weight:700;color:${iWasRight ? 'var(--ok)' : 'var(--accent-dark)'}">${iWasRight ? 'Du auch. Stark!' : 'Du leider nicht.'}</p>` : ''}</div>`;
+      ${isFree ? `<p style="margin:0;font-size:14px"><b>👑 Gekürt:</b> ${S.lastRight.length ? esc(S.lastRight.join(' · ')) : 'Die Reiseleitung kürt noch.'}</p>
+        ${S.lastAll.length ? `<details class="rall"><summary>Alle ${S.lastAll.length} Antworten lesen</summary>${freeAnswerList(lr, S.lastAll, isAdmin())}</details>` : ''}`
+      : `<p style="margin:0;font-size:14px"><b>${lr.kind === 'schaetzen' ? 'Am nächsten dran' : 'Richtig lagen'}:</b> ${S.lastRight.length ? esc(S.lastRight.join(', ')) : 'niemand. Peinlich.'}</p>`}
+      ${mineLast && !meQuiz ? `<p style="margin:0;font-size:14px;font-weight:700;color:${iWasRight ? 'var(--ok)' : 'var(--accent-dark)'}">${isFree ? (iWasRight ? 'Und du bist dabei. Stark!' : 'Diesmal nicht gekürt.') : (iWasRight ? 'Du auch. Stark!' : 'Du leider nicht.')}</p>` : ''}</div>`;
   }
   html += `<button class="btn ghost rlink" data-action="goQuizRank">Zur Rätsel-Rangliste</button></div>`;
   return html;
+}
+
+function freeAnswerList(r, answers, canCrown) {
+  const wins = S.solutions[r.id]?.winner_ids || [];
+  if (!answers.length) return `<p class="rsmall">Noch keine Antworten.</p>`;
+  return `<div class="ranswers">${answers.map((a) => {
+    const won = wins.includes(a.member_id);
+    return `<div class="ranswer ${won ? 'won' : ''}"><div><b>${esc(nick(a.member_id))}</b><p>${esc(a.text_value)}</p></div>
+      ${canCrown ? `<button class="crown ${won ? 'on' : ''}" data-action="crown" data-riddle="${r.id}" data-member="${a.member_id}" aria-label="Küren">👑</button>` : won ? '<span class="crown on">👑</span>' : ''}</div>`;
+  }).join('')}</div>`;
 }
 
 function shortCount(target) {
@@ -824,6 +851,25 @@ const actions = {
     const row = { riddle_id: rid, member_id: S.me.id, option_index: idx };
     await q(sb.from('riddle_answers').upsert(row));
     S.myAnswers[rid] = row; render(); toast('Antwort gespeichert.');
+  },
+  async saveFree(el) {
+    const rid = Number(el.dataset.riddle);
+    const inp = document.querySelector(`[data-input="freeText"][data-riddle="${rid}"]`);
+    const v = String(inp?.value || '').trim();
+    if (!v) return toast('Bitte erst etwas schreiben.');
+    const row = { riddle_id: rid, member_id: S.me.id, text_value: v.slice(0, 300) };
+    await q(sb.from('riddle_answers').upsert(row));
+    S.myAnswers[rid] = row; render(); toast('Antwort gespeichert.');
+  },
+  async crown(el) {
+    if (!isAdmin()) return;
+    const rid = Number(el.dataset.riddle), mid = el.dataset.member;
+    const sol = S.solutions[rid]; if (!sol) return toast('Keine Lösung hinterlegt.');
+    const wins = new Set(sol.winner_ids || []);
+    wins.has(mid) ? wins.delete(mid) : wins.add(mid);
+    const next = [...wins];
+    await q(sb.from('riddle_solutions').update({ winner_ids: next }).eq('riddle_id', rid));
+    sol.winner_ids = next; await loadRiddleExtras(); render(); toast(wins.has(mid) ? 'Gekürt! 👑' : 'Krone zurückgenommen.');
   },
   async saveEstimate(el) {
     const rid = Number(el.dataset.riddle);
