@@ -1,6 +1,6 @@
 // Einfacher Service Worker: hält die App-Hülle offline verfügbar.
 // Daten kommen immer frisch aus Supabase (kein Caching von API-Antworten).
-const CACHE = 'wander-shell-v29';
+const CACHE = 'wander-shell-v30';
 const SHELL = ['./', 'index.html', 'styles.css', 'app.js', 'config.js', 'manifest.webmanifest', 'icons/icon-192.png'];
 
 self.addEventListener('install', (e) => {
@@ -44,12 +44,15 @@ self.addEventListener('push', (e) => {
   }));
 });
 
-// Tippen auf die Nachricht öffnet die App
+// Tippen auf die Nachricht öffnet die App (bzw. holt sie nach vorn)
 self.addEventListener('notificationclick', (e) => {
   e.notification.close();
-  const url = new URL(e.notification.data?.url || './', self.registration.scope).href;
-  e.waitUntil(self.clients.matchAll({ type: 'window', includeUncontrolled: true }).then((list) => {
-    for (const c of list) { if ('focus' in c) { c.navigate(url).catch(() => {}); return c.focus(); } }
+  const url = self.registration.scope; // Startseite der App
+  e.waitUntil((async () => {
+    const list = await self.clients.matchAll({ type: 'window', includeUncontrolled: true });
+    for (const c of list) {
+      try { return await c.focus(); } catch (err) { /* weiter versuchen */ }
+    }
     return self.clients.openWindow(url);
-  }));
+  })());
 });
