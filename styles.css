@@ -227,10 +227,8 @@ h1, h2, h3 { font-family: Archivo, sans-serif; font-weight: 900; margin: 0; line
 .crown.on { opacity: 1; filter: none; }
 .rall summary { cursor: pointer; font-size: 14px; font-weight: 700; color: var(--accent-dark); margin-top: 4px; }
 
-/* Kopfbereich zentriert: Marke, Jubiläum, Countdown wie ein Plakat */
-.hero { text-align: center; }
-.hero .brand { align-items: center; }
-.hero .jubi { align-items: center; }
-.hero .big-count { justify-content: center; }
-.hero .big-count span { text-align: left; }
-.hero > .kicker:last-child { align-self: center; }
+/* Kopfbereich: Logo als zentriertes Emblem, Infos darunter linksbündig.
+   Die Unterzeile ist genau so breit wie HIKE!, die Striche füllen den Rest. */
+.hero .brand { align-self: center; width: fit-content; align-items: stretch; padding: 10px 0 6px; }
+.hero .brand-sub { width: 0; min-width: 100%; padding-left: .26em; } /* zählt nicht zur Breite: HIKE! gibt sie vor */
+.hero .brand-sub i { flex: 1; width: auto; min-width: 14px; }
