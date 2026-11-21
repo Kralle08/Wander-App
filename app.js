@@ -383,9 +383,10 @@ function viewStart() {
       <p class="title">Bist du auf Mallorca dabei?</p>
       <div class="yesno">
         <button class="yn yes ${myStatus === 'ja' ? 'on' : ''}" data-action="rsvp" data-status="ja">${myStatus === 'ja' ? '✓ ' : ''}Ja, ich bin dabei</button>
+        <button class="yn maybe ${myStatus === 'vielleicht' ? 'on' : ''}" data-action="rsvp" data-status="vielleicht">${myStatus === 'vielleicht' ? '✓ ' : ''}Vielleicht</button>
         <button class="yn no ${myStatus === 'nein' ? 'on' : ''}" data-action="rsvp" data-status="nein">${myStatus === 'nein' ? '✓ ' : ''}Nein</button>
       </div>
-      <p class="muted small">${cnt.ja} dabei · ${cnt.nein} nicht dabei · ${cnt.offen} offen</p>
+      <p class="muted small">${cnt.ja} dabei · ${cnt.vielleicht} vielleicht · ${cnt.nein} nicht dabei · ${cnt.offen} offen</p>
       <button class="btn ghost" data-action="open" data-overlay="teil">Wer ist dabei?</button>
     </div>
 
@@ -683,7 +684,7 @@ function viewTeil() {
   S.members.forEach((m) => { cnt[rsvpOf(m.id)]++; });
   return overlayShell(`Teilnehmer · Mallorca ${TOUR_YEAR}`, `
     <h2 style="font-size:28px">Wer ist dabei?</h2>
-    <p class="muted">${cnt.ja} dabei · ${cnt.nein} nicht dabei · ${cnt.offen} offen</p>
+    <p class="muted">${cnt.ja} dabei · ${cnt.vielleicht} vielleicht · ${cnt.nein} nicht dabei · ${cnt.offen} offen</p>
     <div class="card" style="gap:0"><div class="list">
       ${S.members.map((m) => {
         const st = rsvpOf(m.id);
@@ -886,7 +887,7 @@ const actions = {
 
   async rsvp(el) { await setRsvp(S.me.id, el.dataset.status); },
   async cycleRsvp(el) {
-    const order = ['offen', 'ja', 'nein'];
+    const order = ['offen', 'ja', 'vielleicht', 'nein'];
     const id = el.dataset.member;
     const next = order[(order.indexOf(rsvpOf(id)) + 1) % order.length];
     if (next === 'offen') {
