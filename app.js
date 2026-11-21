@@ -402,6 +402,7 @@ function viewNotifCard() {
 
 function viewRiddleCard(cr, lr, first) {
   const players = S.members.filter((m) => !m.is_guest && !m.is_quizmaster).length;
+  const nextR = S.riddles.find((r) => new Date(r.publish_at).getTime() > now()) || null;
   const meQuiz = isQuizmaster();
   const lb = S.leaderboard.find((r) => r.member_id === S.me.id);
   let myRank = null;
@@ -436,12 +437,21 @@ function viewRiddleCard(cr, lr, first) {
     html += `<div class="rmeta"><span>Auflösung in</span><b id="riddleCount" data-target="${esc(cr.resolve_at)}">${shortCount(cr.resolve_at)}</b></div>
       <div class="rbar"><i style="width:${players ? Math.round(Math.min(S.riddleCount, players) / players * 100) : 0}%"></i></div>
       <p class="rsmall">${S.riddleCount} von ${players} haben getippt${!meQuiz && !mine ? ' · du fehlst noch!' : ''}${myRank && !meQuiz ? ` · Du bist aktuell auf Platz ${myRank}` : ''}</p>`;
-  } else if (first && new Date(first.publish_at).getTime() > now()) {
+    if (isAdmin()) {
+      const all = players > 0 && S.riddleCount >= players;
+      const needCrown = cr.kind === 'frei' && !(S.solutions[cr.id]?.winner_ids || []).length;
+      html += all
+        ? `<div class="rstamp">🎉 Alle haben getippt.${needCrown ? ' Erst küren, dann auflösen.' : ''}</div>
+           <button class="btn light" data-action="resolveNow" data-riddle="${cr.id}" ${needCrown ? 'disabled' : ''}>Jetzt auflösen</button>`
+        : `<button class="btn ghost rlink" data-action="resolveNow" data-riddle="${cr.id}">Vorzeitig auflösen (Reiseleitung)</button>`;
+    }
+  } else if (nextR) {
+    const isFirst = nextR === first;
     html += `<p class="rbrand">Wer weiß denn sowas?</p>
-      <div class="riddle-top"><span class="label">Der Rätselsteig · 20 Etappen bis Mallorca</span></div>
-      <p class="rq" style="font-size:20px">Die erste Etappe startet in</p>
-      <div class="count4 rcount" id="riddleStart" data-target="${esc(first.publish_at)}">${countHtml(first.publish_at)}</div>
-      <p class="rsmall">Ab ${fmtDateTime(first.publish_at)} alle 14 Tage ein neues Rätsel. Wer am Ende vorne liegt, sucht sich auf Mallorca als Erster sein Zimmer aus.</p>`;
+      <div class="riddle-top"><span class="label">Der Rätselsteig · ${isFirst ? S.riddles.length + ' Etappen bis Mallorca' : 'Etappe ' + nextR.nr + ' von ' + S.riddles.length}</span></div>
+      <p class="rq" style="font-size:20px">${isFirst ? 'Die erste Etappe startet in' : 'Die nächste Etappe startet in'}</p>
+      <div class="count4 rcount" id="riddleStart" data-target="${esc(nextR.publish_at)}">${countHtml(nextR.publish_at)}</div>
+      <p class="rsmall">${isFirst ? `Ab ${fmtDateTime(first.publish_at)} alle 14 Tage ein neues Rätsel, jeweils sonntags um 20 Uhr. Ihr habt 3 Tage Zeit, Mittwoch um 20 Uhr wird aufgelöst. Wer am Ende vorne liegt, sucht sich auf Mallorca als Erster sein Zimmer aus.` : `Am ${fmtDateTime(nextR.publish_at)} geht es weiter. Ihr habt dann wieder 3 Tage Zeit.`}</p>`;
   } else {
     html += `<p class="rbrand">Wer weiß denn sowas?</p><span class="label">Der Rätselsteig</span><p class="rq">Alle 20 Etappen sind geschafft.</p>`;
   }
@@ -462,6 +472,13 @@ function viewRiddleCard(cr, lr, first) {
   }
   html += `<button class="btn ghost rlink" data-action="goQuizRank">Zur Rätsel-Rangliste</button></div>`;
   return html;
+}
+
+// Zweites Tippen innerhalb von 5 Sekunden bestätigt (ohne Browser-Dialog)
+function confirmTwice(el) {
+  const k = el.dataset.riddle, t = Date.now();
+  if (S._confirm && S._confirm.k === k && t - S._confirm.t < 5000) { S._confirm = null; return true; }
+  S._confirm = { k, t }; return false;
 }
 
 function freeAnswerList(r, answers, canCrown) {
@@ -852,6 +869,17 @@ const actions = {
     await q(sb.from('riddle_answers').upsert(row));
     S.myAnswers[rid] = row; render(); toast('Antwort gespeichert.');
   },
+  async resolveNow(el) {
+    if (!isAdmin()) return;
+    const rid = Number(el.dataset.riddle);
+    const r = S.riddles.find((x) => x.id === rid);
+    const players = S.members.filter((m) => !m.is_guest && !m.is_quizmaster).length;
+    if (S.riddleCount < players && !confirmTwice(el)) return toast(`Erst ${S.riddleCount} von ${players} haben getippt. Zum Auflösen nochmal tippen.`);
+    const at = new Date().toISOString();
+    await q(sb.from('riddles').update({ resolve_at: at }).eq('id', rid));
+    if (r) r.resolve_at = at;
+    await loadAll(); render(); toast('Aufgelöst! Alle sehen jetzt die Lösung.');
+  },
   async saveFree(el) {
     const rid = Number(el.dataset.riddle);
     const inp = document.querySelector(`[data-input="freeText"][data-riddle="${rid}"]`);
@@ -974,7 +1002,7 @@ app.addEventListener('click', (ev) => {
   const el = ev.target.closest('[data-action]');
   if (!el || el.disabled) return;
   const fn = actions[el.dataset.action];
-  const WRITES = ['rsvp', 'cycleRsvp', 'answer', 'saveEstimate', 'slotAdd', 'slotDel', 'pack', 'kSave', 'kDel', 'saveEmail', 'addGuest'];
+  const WRITES = ['rsvp', 'cycleRsvp', 'answer', 'saveEstimate', 'saveFree', 'crown', 'resolveNow', 'slotAdd', 'slotDel', 'pack', 'kSave', 'kDel', 'saveEmail', 'addGuest'];
   if (S.preview && WRITES.includes(el.dataset.action)) { ev.preventDefault(); toast('In der Vorschau wird nichts gespeichert.'); return; }
   if (fn) { ev.preventDefault(); Promise.resolve(fn(el)).catch((e) => console.error(e)); }
 });
