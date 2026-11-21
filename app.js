@@ -197,7 +197,7 @@ function viewLogin() {
         <button class="btn block" data-action="sendCode" ${L.busy ? 'disabled' : ''}>Code schicken</button>
       ` : `
         <p class="title">Code eingeben</p>
-        <p class="muted">Wir haben dir eine Mail an <b>${esc(L.email)}</b> geschickt. Steht darin ein Code, gib ihn hier ein. Steht darin ein Link, tipp ihn an, am besten auf diesem Gerät und in diesem Browser. Schau auch im Spam-Ordner nach.</p>
+        <p class="muted">Ich habe dir eine Mail an <b>${esc(L.email)}</b> geschickt. Steht darin ein Code, gib ihn hier ein. Steht darin ein Link, tipp ihn an, am besten auf diesem Gerät und in diesem Browser. Schau auch im Spam-Ordner nach.</p>
         <label class="field">Code
           <input class="code-input" inputmode="numeric" autocomplete="one-time-code" maxlength="10" data-input="loginCode" value="${esc(L.code)}">
         </label>
@@ -396,7 +396,7 @@ function viewNotifCard() {
   }
   if (Notification.permission !== 'default') return '';
   return `<div class="card alert"><span class="label">Keine Enthüllung verpassen</span>
-    <p class="muted">Wir sagen Bescheid, wenn etwas enthüllt wird oder ein neues Rätsel kommt. Sonst nichts, versprochen.</p>
+    <p class="muted">Ich sage dir Bescheid, wenn ich etwas enthülle oder ein neues Rätsel kommt. Sonst nichts, versprochen.</p>
     <button class="btn block" data-action="allowNotif">Mitteilungen erlauben</button></div>`;
 }
 
@@ -455,7 +455,7 @@ function viewRiddleCard(cr, lr, first) {
     html += `<div class="rsolve"><span class="label" style="color:var(--accent)">Auflösung Etappe ${lr.nr}</span>
       <p style="margin:0;font-weight:800;font-size:17px">${esc(right)}</p>
       <p class="muted small" style="margin:0">${esc(sol.explanation || '')}</p>
-      ${isFree ? `<p style="margin:0;font-size:14px"><b>👑 Gekürt:</b> ${S.lastRight.length ? esc(S.lastRight.join(' · ')) : 'Die Reiseleitung kürt noch.'}</p>
+      ${isFree ? `<p style="margin:0;font-size:14px"><b>👑 Gekürt:</b> ${S.lastRight.length ? esc(S.lastRight.join(' · ')) : 'Ich küre noch.'}</p>
         ${S.lastAll.length ? `<details class="rall"><summary>Alle ${S.lastAll.length} Antworten lesen</summary>${freeAnswerList(lr, S.lastAll, isAdmin())}</details>` : ''}`
       : `<p style="margin:0;font-size:14px"><b>${lr.kind === 'schaetzen' ? 'Am nächsten dran' : 'Richtig lagen'}:</b> ${S.lastRight.length ? esc(S.lastRight.join(', ')) : 'niemand. Peinlich.'}</p>`}
       ${mineLast && !meQuiz ? `<p style="margin:0;font-size:14px;font-weight:700;color:${iWasRight ? 'var(--ok)' : 'var(--accent-dark)'}">${isFree ? (iWasRight ? 'Und du bist dabei. Stark!' : 'Diesmal nicht gekürt.') : (iWasRight ? 'Du auch. Stark!' : 'Du leider nicht.')}</p>` : ''}</div>`;
@@ -650,7 +650,7 @@ function viewTeil() {
       ${S.members.map((m) => {
         const st = rsvpOf(m.id);
         return `<div class="row"><div class="grow"><b>${esc(m.nickname)}${m.id === S.me.id ? ' (du)' : ''}</b>
-          <span class="muted small">${m.is_guest ? 'Von der Reiseleitung hinzugefügt' : (st === 'offen' ? 'Hat noch nicht geantwortet' : '')}${isAdmin() && !m.is_guest ? (m.email ? ' · ' + esc(m.email) : ' · keine E-Mail hinterlegt') : ''}</span></div>
+          <span class="muted small">${m.is_guest ? 'Von mir hinzugefügt' : (st === 'offen' ? 'Hat noch nicht geantwortet' : '')}${isAdmin() && !m.is_guest ? (m.email ? ' · ' + esc(m.email) : ' · keine E-Mail hinterlegt') : ''}</span></div>
           ${isAdmin() || m.id === S.me.id ? `<button class="pill ${st}" data-action="cycleRsvp" data-member="${m.id}">${ST_LABEL[st]}</button>` : `<span class="pill ${st}" style="display:inline-flex;align-items:center">${ST_LABEL[st]}</span>`}
         </div>
         ${isAdmin() && !m.is_guest ? `<div style="display:flex;gap:6px;padding-bottom:10px;border-bottom:1px solid #EEF1EA">
@@ -719,7 +719,7 @@ function viewStage(id) {
         <span class="tltime">${esc(x.at_time)}</span>
         <div class="grow"><b>${esc(x.title)}</b>${x.note ? `<span class="muted small" style="display:block">${esc(x.note)}</span>` : ''}</div>
         ${isAdmin() ? `<button class="pill nein" data-action="schedDel" data-id="${x.id}" aria-label="Punkt löschen">×</button>` : ''}
-      </div>`).join('')}</div>` : `<p class="muted">${isAdmin() ? 'Noch nichts eingetragen.' : 'Der Tagesablauf folgt. Die Reiseleitung ist dran.'}</p>`}
+      </div>`).join('')}</div>` : `<p class="muted">${isAdmin() ? 'Noch nichts eingetragen.' : 'Der Tagesablauf folgt. Ich bin dran.'}</p>`}
     </div>
     ${isAdmin() ? `<div class="card dark"><span class="label">Punkt hinzufügen</span>
       <div style="display:grid;grid-template-columns:110px 1fr;gap:8px">
