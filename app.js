@@ -670,8 +670,8 @@ function overlayShell(label, inner) {
 function viewPack() {
   const done = packDoneCount();
   return overlayShell('Packliste Mallorca', `
-    <h2 style="font-size:28px">Ja, Potti: Das ist die aktualisierte Packliste.</h2>
-    <p class="muted">2019 wollte Potti Ossis Packliste „gerne als To-do-Liste“. Acht Jahre später ist sie da: das Original, ergänzt um alles für Mallorca. Deine Haken sieht nur du.</p>
+    <h2 style="font-size:28px">Die Packliste</h2>
+    <p class="muted">Potti hat sie gefordert, hier ist sie. Deine Haken sieht nur du.</p>
     <div class="card"><b>${done} von ${PACK_TOTAL} gepackt${done === PACK_TOTAL ? ' · Startklar!' : ''}</b><div class="progress"><i style="width:${Math.round(done / PACK_TOTAL * 100)}%"></i></div></div>
     ${PACK.map(([g, items]) => `<div class="card" style="gap:2px"><span class="label">${esc(g)}</span>
       ${items.map(([k, label]) => `<button class="check ${S.packing[k] ? 'done' : ''}" data-action="pack" data-key="${k}"><span class="box">${S.packing[k] ? '✓' : ''}</span><span>${esc(label)}</span></button>`).join('')}
