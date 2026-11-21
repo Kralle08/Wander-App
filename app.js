@@ -1,5 +1,5 @@
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
-import { SUPABASE_URL, SUPABASE_KEY, TOUR_YEAR } from './config.js';
+import { SUPABASE_URL, SUPABASE_KEY, TOUR_YEAR, VAPID_PUBLIC } from './config.js';
 
 const sb = createClient(SUPABASE_URL, SUPABASE_KEY, {
   auth: { persistSession: true, autoRefreshToken: true, detectSessionInUrl: true, flowType: 'pkce' }
@@ -169,6 +169,26 @@ async function afterLogin() {
   S.me = me;
   await loadAll();
   render();
+  ensurePush();
+}
+
+// ---------------------------------------------------------------- Push
+// Meldet dieses Gerät für Push an (nur wenn Mitteilungen erlaubt sind) und merkt es sich in Supabase.
+async function ensurePush() {
+  try {
+    if (!('serviceWorker' in navigator) || !('PushManager' in window) || !('Notification' in window)) return false;
+    if (Notification.permission !== 'granted') return false;
+    const reg = await navigator.serviceWorker.ready;
+    let sub = await reg.pushManager.getSubscription();
+    if (!sub) {
+      const raw = Uint8Array.from(atob(VAPID_PUBLIC.replace(/-/g, '+').replace(/_/g, '/')), (c) => c.charCodeAt(0));
+      sub = await reg.pushManager.subscribe({ userVisibleOnly: true, applicationServerKey: raw });
+    }
+    const j = sub.toJSON();
+    const { error } = await sb.rpc('save_push_subscription', { p_endpoint: j.endpoint, p_p256dh: j.keys.p256dh, p_auth: j.keys.auth, p_ua: navigator.userAgent.slice(0, 200) });
+    if (error) { console.error(error); return false; }
+    return true;
+  } catch (e) { console.error('push', e); return false; }
 }
 
 
@@ -374,7 +394,8 @@ function viewStart() {
       <button class="tile" data-action="open" data-overlay="pack"><b>Packliste</b><span>${packDoneCount()} von ${PACK_TOTAL} gepackt</span></button>
       <button class="tile" data-action="open" data-overlay="teil"><b>Teilnehmer</b><span>${cnt.ja} Zusagen</span></button>
     </div>
-    ${S.me.is_admin && !S.preview ? `<button class="btn ghost" data-action="previewOn">Als Mitglied ansehen (Vorschau)</button>` : ''}
+    ${S.me.is_admin && !S.preview ? `<button class="btn ghost" data-action="previewOn">Als Mitglied ansehen (Vorschau)</button>
+    <button class="btn ghost" data-action="testPush">Test-Mitteilung an mich</button>` : ''}
     <button class="btn ghost" data-action="logout">Abmelden (${esc(S.me.nickname)})</button>
   </div>`;
 }
@@ -820,6 +841,13 @@ const actions = {
   close() { S.overlay = null; render(); },
   previewOn() { S.preview = true; S.overlay = null; applyPreview(); window.scrollTo(0, 0); render(); toast('Vorschau aktiv: Du siehst die App wie ein normales Mitglied.'); },
   previewOff() { endPreview(); render(); },
+  async testPush() {
+    if (!('Notification' in window) || Notification.permission !== 'granted') { toast('Erst Mitteilungen erlauben (Karte oben auf der Startseite).'); return; }
+    const ok = await ensurePush();
+    if (!ok) { toast('Dieses Gerät konnte sich nicht anmelden. App bitte über den Home-Bildschirm öffnen.'); return; }
+    const { error } = await sb.rpc('send_test_push');
+    toast(error ? 'Fehler: ' + error.message : 'Unterwegs! In ein paar Sekunden sollte die Mitteilung kommen.');
+  },
   openStage(el) { S.overlay = { stage: Number(el.dataset.id) }; S.sched = { time: '', title: '', note: '' }; render(); },
   async schedAdd(el) {
     const F = S.sched;
@@ -847,7 +875,13 @@ const actions = {
 
   async allowNotif() {
     try { await Notification.requestPermission(); } catch (e) { /* ignorieren */ }
-    toast(Notification.permission === 'granted' ? 'Mitteilungen sind an. Bis zur nächsten Enthüllung!' : 'Kein Problem. Du kannst Mitteilungen später in den Einstellungen erlauben.');
+    if (Notification.permission === 'granted') {
+      const ok = await ensurePush();
+      toast(ok ? 'Mitteilungen sind an. Ich melde mich, wenn es etwas Neues gibt!' : 'Mitteilungen erlaubt, aber die Anmeldung hat nicht geklappt. Öffne die App bitte über den Home-Bildschirm.');
+    } else {
+      toast('Kein Problem. Du kannst Mitteilungen später in den Einstellungen erlauben.');
+    }
+    render();
   },
 
   async rsvp(el) { await setRsvp(S.me.id, el.dataset.status); },
