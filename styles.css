@@ -36,6 +36,16 @@ h1, h2, h3 { font-family: Archivo, sans-serif; font-weight: 900; margin: 0; line
 .kicker { font-size: 12px; font-weight: 700; letter-spacing: .14em; color: #CFE0D2; }
 .chip { font-size: 12px; font-weight: 600; background: var(--pine-2); color: #fff; padding: 6px 10px; border-radius: 999px; }
 .hero h1 { font-size: 34px; }
+/* Marke HIKE! */
+.brand { display: flex; flex-direction: column; align-items: flex-start; gap: 6px; padding: 4px 0 2px; }
+.brand-word { font-family: Archivo, sans-serif; font-weight: 900; font-size: 104px; line-height: .82; letter-spacing: -.035em; color: #fff; text-transform: uppercase; }
+.brand-word em { font-style: normal; color: var(--peach); margin-left: .02em; }
+.brand-sub { display: flex; align-items: center; gap: 10px; font-size: 12.5px; font-weight: 800; letter-spacing: .26em; color: #CFE0D2; white-space: nowrap; }
+.brand-sub i { display: block; width: 22px; height: 2px; background: var(--peach); border-radius: 1px; }
+.jubi { display: flex; flex-direction: column; gap: 4px; margin-top: 6px; padding-top: 14px; border-top: 1px solid rgba(255,255,255,.14); }
+.jubi-label { font-size: 12px; font-weight: 700; letter-spacing: .14em; text-transform: uppercase; color: var(--peach); }
+.jubi h1 { font-size: 40px; }
+@media (max-width: 360px) { .brand-word { font-size: 88px; } .brand-sub { letter-spacing: .2em; } }
 .hero p { margin: 0; font-size: 14px; color: #CFE0D2; }
 .big-count { display: flex; align-items: flex-end; gap: 12px; }
 .big-count b { font-family: Archivo, sans-serif; font-weight: 900; font-size: 84px; line-height: .85; }
@@ -139,6 +149,7 @@ h1, h2, h3 { font-family: Archivo, sans-serif; font-weight: 900; margin: 0; line
 /* Login */
 .login { min-height: 100vh; background: var(--pine); color: #fff; display: flex; flex-direction: column; justify-content: center; padding: 30px 22px; gap: 18px; }
 .login h1 { font-size: 40px; }
+.login .brand-word { font-size: 120px; }
 .login .card { color: var(--ink); }
 
 /* Fotos */

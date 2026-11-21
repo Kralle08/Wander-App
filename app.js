@@ -164,13 +164,22 @@ async function afterLogin() {
   render();
 }
 
+
+// ---------------------------------------------------------------- Marke
+function brandHtml() {
+  return `<div class="brand">
+    <span class="brand-word">HIKE<em>!</em></span>
+    <span class="brand-sub"><i></i>CREW HESSEN · EST. 2018<i></i></span>
+  </div>`;
+}
+
 // ---------------------------------------------------------------- Login
 function viewLogin() {
   const L = S.login;
   return `
   <div class="login">
-    <span class="kicker">WANDERCLUB · SEIT 2018</span>
-    <h1>10 Jahre.<br>Jubiläumstour Mallorca</h1>
+    ${brandHtml()}
+    <div class="jubi"><span class="jubi-label">10 Jahre · Jubiläumswanderung 2027</span><h1>Mallorca</h1></div>
     <div class="card">
       ${L.step === 'email' ? `
         <p class="title">Anmelden</p>
@@ -311,8 +320,9 @@ function viewStart() {
 
   return `
   <section class="hero">
-    <div class="hero-top"><span class="kicker">WANDERCLUB · SEIT 2018</span><span class="chip">Reiseleitung: ${esc(orgaNames || '–')}</span></div>
-    <h1>10 Jahre.<br>${esc(t?.title || 'Jubiläumstour')}</h1>
+    <div class="hero-top"><span class="kicker">HUT, HUT …</span><span class="chip">Reiseleitung: ${esc(orgaNames || '–')}</span></div>
+    ${brandHtml()}
+    <div class="jubi"><span class="jubi-label">10 Jahre · Jubiläumswanderung ${TOUR_YEAR}</span><h1>Mallorca</h1></div>
     <p>${esc(t?.region || '')}${t ? ' · ' + fmtDate(t.date_from) + '–' + fmtDate(t.date_to) : ''}${t?.motto ? '<br>Motto: ' + esc(t.motto) : ''}</p>
     <div class="big-count"><b>${daysLeft}</b><span>Tage bis<br>zum Abflug</span></div>
     <div class="bars">${Array.from({ length: 10 }, (_, i) => `<i class="${i < past ? 'on' : ''}"></i>`).join('')}</div>
@@ -542,7 +552,7 @@ function viewOlympia() {
   const unlock = new Date('2027-06-01T20:00:00+02:00').getTime() <= now();
   return `<div class="pad">
     <h2 style="font-size:30px">Jubiläums-Olympiade</h2>
-    <p class="muted">2027 auf Mallorca · die nächste gibt es erst zu 20 Jahren Wanderclub, 2037.</p>
+    <p class="muted">2027 auf Mallorca · die nächste gibt es erst zu 20 Jahren HIKE!, 2037.</p>
     <div class="card" style="background:#8A5A12;color:#fff">
       <span class="label" style="color:#FFE2B8">Der Preis</span>
       <p class="title">Die goldene Wandermütze</p>
