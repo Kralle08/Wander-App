@@ -226,3 +226,11 @@ h1, h2, h3 { font-family: Archivo, sans-serif; font-weight: 900; margin: 0; line
 .crown { border: none; background: transparent; font-size: 22px; line-height: 1; cursor: pointer; opacity: .25; padding: 2px; filter: grayscale(1); }
 .crown.on { opacity: 1; filter: none; }
 .rall summary { cursor: pointer; font-size: 14px; font-weight: 700; color: var(--accent-dark); margin-top: 4px; }
+
+/* Kopfbereich zentriert: Marke, Jubiläum, Countdown wie ein Plakat */
+.hero { text-align: center; }
+.hero .brand { align-items: center; }
+.hero .jubi { align-items: center; }
+.hero .big-count { justify-content: center; }
+.hero .big-count span { text-align: left; }
+.hero > .kicker:last-child { align-self: center; }
