@@ -69,7 +69,7 @@ async function q(promise) {
 }
 
 // Wird bei jeder Veröffentlichung erhöht (gleiche Zahl wie der Cache im Service Worker)
-const APP_VERSION = 37;
+const APP_VERSION = 38;
 
 // ---------------------------------------------------------------- Laden
 async function loadAll() {
@@ -1283,6 +1283,21 @@ function resizeImage(file, max = 1600, quality = 0.82) {
   });
 }
 
+// Aufnahmedatum: erst aus dem Dateinamen (WhatsApp-Export iPhone „PHOTO-2019-09-21-…“, Android „IMG-20190921-WA…“),
+// dann Änderungsdatum der Datei, wenn es im Tourjahr liegt, sonst der erste Tourtag.
+function photoDate(file, tourId, year) {
+  const ok = (y, m, d) => Number(y) === Number(year) && m >= 1 && m <= 12 && d >= 1 && d <= 31;
+  for (const m of file.name.matchAll(/(20\d\d)[-_]?(\d\d)[-_]?(\d\d)/g)) {
+    if (ok(m[1], Number(m[2]), Number(m[3]))) return `${m[1]}-${m[2]}-${m[3]}`;
+  }
+  if (file.lastModified) {
+    const d = new Date(file.lastModified).toISOString().slice(0, 10);
+    if (d.slice(0, 4) === String(year)) return d;
+  }
+  const tour = S.tours.find((t) => t.id === tourId);
+  return tour?.date_from || null;
+}
+
 app.addEventListener('change', async (ev) => {
   const el = ev.target.closest('[data-upload]');
   if (!el || !el.files?.length) return;
@@ -1297,8 +1312,7 @@ app.addEventListener('change', async (ev) => {
       const path = `${year}/${Date.now()}-${Math.random().toString(36).slice(2, 8)}.jpg`;
       const up = await sb.storage.from('tour-photos').upload(path, blob, { contentType: 'image/jpeg', upsert: false });
       if (up.error) throw up.error;
-      const dm = files[i].name.match(/(20\d\d)-(\d\d)-(\d\d)/);
-      const takenOn = dm ? `${dm[1]}-${dm[2]}-${dm[3]}` : (files[i].lastModified ? new Date(files[i].lastModified).toISOString().slice(0, 10) : null);
+      const takenOn = photoDate(files[i], tourId, year);
       const row = await q(sb.from('tour_photos').insert({ tour_id: tourId, storage_path: path, sort: sort++, taken_on: takenOn }).select().single());
       S.photos.push(row); ok++;
     } catch (e) { console.error(e); toast('Ein Foto ging nicht: ' + (e.message || e)); }
