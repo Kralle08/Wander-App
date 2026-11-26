@@ -69,7 +69,7 @@ async function q(promise) {
 }
 
 // Wird bei jeder Veröffentlichung erhöht (gleiche Zahl wie der Cache im Service Worker)
-const APP_VERSION = 39;
+const APP_VERSION = 40;
 
 // ---------------------------------------------------------------- Laden
 async function loadAll() {
@@ -398,7 +398,6 @@ function viewTimeTravel() {
     <button class="ttimg" data-action="lightbox" data-path="${esc(photo.storage_path)}" aria-label="Foto vergrößern"><img src="${esc(S.photoUrls[photo.storage_path])}" alt="Foto ${y}" loading="lazy"></button>
     <p class="title" style="margin:0">${esc(tour?.title || 'Tour ' + y)} ${y}</p>
     <p class="muted small" style="margin:0">${fmtDate(photo.taken_on)}${day}${exact ? '' : ' · morgen gibt es ein neues Foto'}</p>
-    <button class="btn ghost" data-action="openYear" data-year="${tour?.year || y}">Mehr von ${y}</button>
   </div>`;
 }
 
