@@ -1,4 +1,4 @@
-// Verschickt Push-Nachrichten, sobald ein Rätsel, eine Auflösung oder eine Enthüllung fällig ist.
+// Verschickt Push-Nachrichten, sobald ein Rätsel, eine Auflösung, eine Enthüllung oder eine neue Abstimmung fällig ist.
 // Wird alle 10 Minuten von pg_cron aufgerufen. Jede Meldung geht genau einmal raus (push_log).
 import { createClient } from 'jsr:@supabase/supabase-js@2';
 import { sendPush } from './webpush.js';
@@ -71,6 +71,15 @@ Deno.serve(async (req) => {
     const n = await sendAll({ title: 'HIKE! · Enthüllung', body: `Ich habe enthüllt: ${r.teaser}. Schau rein!`, url: './', tag: 'reveal-' + r.id });
     await db.from('push_log').update({ recipients: n }).eq('kind', 'reveal').eq('ref_id', r.id);
     sent.push({ reveal: r.id, n });
+  }
+
+  // Neue Abstimmung
+  const { data: polls } = await db.from('polls').select('id,question,created_at,closed').gte('created_at', since).eq('closed', false);
+  for (const p of polls || []) {
+    if (!(await claim('poll', p.id))) continue;
+    const n = await sendAll({ title: 'HIKE! · Abstimmung', body: `${p.question} Stimm ab!`, url: './', tag: 'poll-' + p.id });
+    await db.from('push_log').update({ recipients: n }).eq('kind', 'poll').eq('ref_id', p.id);
+    sent.push({ poll: p.id, n });
   }
 
   return Response.json({ ok: true, sent });

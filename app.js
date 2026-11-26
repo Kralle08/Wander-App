@@ -38,6 +38,8 @@ const S = {
   overlay: null,       // 'pack' | 'kasse' | 'teil' | {year}
   login: { step: 'email', email: '', code: '', busy: false, error: '' },
   kasse: { title: '', amount: '', paidBy: null, forIds: null, busy: false },
+  polls: [], pollOptions: [], pollVotes: [],
+  pollForm: { q: '', opts: ['', ''], multi: false, closes: '', busy: false },
   guestName: '',
   notice: '',
   preview: false,
@@ -82,6 +84,12 @@ async function loadAll() {
     q(sb.from('orga_slots').select('*')),
     q(sb.rpc('riddle_schedule'))
   ]);
+  const [polls, pollOptions, pollVotes] = await Promise.all([
+    q(sb.from('polls').select('*').order('created_at', { ascending: false })),
+    q(sb.from('poll_options').select('*').order('sort').order('id')),
+    q(sb.from('poll_votes').select('*'))
+  ]);
+  S.polls = polls; S.pollOptions = pollOptions; S.pollVotes = pollVotes;
   S.members = members; S.tours = tours; S.organizers = organizers; S.stages = stages;
   S.reveals = reveals;
   // Fahrplan für alle 20 Etappen; Fragen nur für bereits veröffentlichte Rätsel
@@ -360,6 +368,9 @@ function viewStart() {
 
     ${viewRiddleCard(cr, lr, firstRiddle)}
 
+    ${openPolls().slice(0, 2).map((p) => pollCard(p)).join('')}
+    ${openPolls().length > 2 ? `<button class="btn ghost" data-action="open" data-overlay="polls">Alle ${openPolls().length} offenen Abstimmungen</button>` : ''}
+
     ${rv.finished ? `
       <div class="card dark"><span class="label">Enthüllungen</span><p class="title">Alles enthüllt. Ab nach Mallorca!</p></div>
     ` : `
@@ -394,6 +405,7 @@ function viewStart() {
       <button class="tile" data-action="open" data-overlay="kasse"><b>Kasse</b><span>Wer schuldet wem</span></button>
       <button class="tile" data-action="open" data-overlay="pack"><b>Packliste</b><span>${packDoneCount()} von ${PACK_TOTAL} gepackt</span></button>
       <button class="tile" data-action="open" data-overlay="teil"><b>Teilnehmer</b><span>${cnt.ja} Zusagen</span></button>
+      <button class="tile" data-action="open" data-overlay="polls"><b>Abstimmungen</b><span>${openPolls().length ? openPolls().length + ' offen' : 'Alle Ergebnisse'}</span></button>
     </div>
     ${S.me.is_admin && !S.preview ? `<button class="btn ghost" data-action="previewOn">Als Mitglied ansehen (Vorschau)</button>
     <button class="btn ghost" data-action="testPush">Test-Mitteilung an mich</button>` : ''}
@@ -704,6 +716,62 @@ function viewTeil() {
       <button class="btn" data-action="addGuest">Hinzufügen</button></div>` : ''}`);
 }
 
+// ---------------------------------------------------------------- Abstimmungen
+const pollIsOpen = (p) => !p.closed && (!p.closes_at || new Date(p.closes_at).getTime() > now());
+const openPolls = () => S.polls.filter(pollIsOpen);
+const voters = () => S.members.filter((m) => !m.is_guest);
+
+function pollCard(p, inOverlay = false) {
+  const opts = S.pollOptions.filter((o) => o.poll_id === p.id);
+  const votes = S.pollVotes.filter((v) => v.poll_id === p.id);
+  const people = new Set(votes.map((v) => v.member_id));
+  const mine = new Set(votes.filter((v) => v.member_id === S.me.id).map((v) => v.option_id));
+  const open = pollIsOpen(p);
+  const max = Math.max(1, ...opts.map((o) => votes.filter((v) => v.option_id === o.id).length));
+  const missing = voters().filter((m) => !people.has(m.id)).map((m) => m.nickname);
+  return `<div class="card poll">
+    <span class="label">${open ? 'Abstimmung' : 'Abstimmung · beendet'}</span>
+    <p class="title">${esc(p.question)}</p>
+    <p class="muted small">${p.multi ? 'Mehrere Antworten möglich' : 'Eine Antwort'}${p.closes_at ? ` · ${open ? 'läuft bis' : 'endete am'} ${fmtDateTime(p.closes_at)}` : ''}</p>
+    <div class="popts">
+      ${opts.map((o) => {
+        const vs = votes.filter((v) => v.option_id === o.id);
+        const pct = people.size ? Math.round((vs.length / people.size) * 100) : 0;
+        const lead = !open && vs.length === max && vs.length > 0;
+        return `<button class="popt ${mine.has(o.id) ? 'on' : ''} ${lead ? 'lead' : ''}" ${open ? `data-action="vote" data-poll="${p.id}" data-option="${o.id}"` : 'disabled'}>
+          <span class="pbar" style="width:${pct}%"></span>
+          <span class="prow"><span class="pchk">${mine.has(o.id) ? '✓' : ''}</span><span class="ptext">${esc(o.label)}</span><b>${vs.length}</b></span>
+          ${vs.length ? `<span class="pwho">${vs.map((v) => esc(nick(v.member_id))).join(', ')}</span>` : ''}
+        </button>`;
+      }).join('')}
+    </div>
+    <p class="muted small">${people.size} von ${voters().length} haben abgestimmt${open && missing.length && missing.length <= 4 ? ' · fehlt noch: ' + esc(missing.join(', ')) : ''}</p>
+    ${isAdmin() && inOverlay ? `<div style="display:flex;gap:14px">
+      ${open ? `<button class="btn ghost" data-action="pollClose" data-poll="${p.id}">Beenden</button>` : ''}
+      <button class="btn ghost" data-action="pollDel" data-poll="${p.id}">Löschen</button></div>` : ''}
+  </div>`;
+}
+
+function viewPolls() {
+  const F = S.pollForm;
+  const open = openPolls(), done = S.polls.filter((p) => !pollIsOpen(p));
+  return overlayShell('Abstimmungen', `
+    <h2 style="font-size:28px">Abstimmungen</h2>
+    <p class="muted">Tipp auf eine Antwort, um abzustimmen. Nochmal tippen nimmt die Stimme zurück. Wer was gewählt hat, sehen alle.</p>
+    ${isAdmin() ? `<div class="card dark"><span class="label">Neue Abstimmung</span>
+      <label class="field" style="color:#fff">Frage<input type="text" maxlength="200" data-input="pollQ" value="${esc(F.q)}" placeholder="z. B. Welcher Flug?"></label>
+      ${F.opts.map((o, i) => `<label class="field" style="color:#fff">Antwort ${i + 1}<input type="text" maxlength="120" data-input="pollOpt" data-i="${i}" value="${esc(o)}" placeholder="${i === 0 ? 'z. B. Freitag 6:10 Uhr ab FRA' : i === 1 ? 'z. B. Donnerstag 18:45 Uhr ab FRA' : 'weitere Antwort'}"></label>`).join('')}
+      ${F.opts.length < 8 ? `<button class="btn ghost" style="color:#fff" data-action="pollAddOpt">+ Antwort hinzufügen</button>` : ''}
+      <div class="chips"><button class="chipbtn ${F.multi ? '' : 'on'}" data-action="pollMulti" data-v="0">Eine Antwort</button><button class="chipbtn ${F.multi ? 'on' : ''}" data-action="pollMulti" data-v="1">Mehrere Antworten</button></div>
+      <label class="field" style="color:#fff">Läuft bis (optional)<input type="datetime-local" data-input="pollCloses" value="${esc(F.closes)}"></label>
+      <button class="btn" data-action="pollCreate" ${F.busy ? 'disabled' : ''}>Abstimmung starten</button>
+      <p class="muted small">Alle bekommen sofort eine Mitteilung.</p>
+    </div>` : ''}
+    ${open.length ? open.map((p) => pollCard(p, true)).join('') : '<div class="card"><p class="muted">Gerade läuft keine Abstimmung.</p></div>'}
+    ${done.length ? `<span class="label" style="margin-top:6px">Ergebnisse</span>${done.map((p) => pollCard(p, true)).join('')}` : ''}
+  `);
+}
+
 function viewKasse() {
   const K = S.kasse;
   const people = participants();
@@ -816,6 +884,7 @@ function render() {
   if (S.overlay === 'pack') ov = viewPack();
   else if (S.overlay === 'teil') ov = viewTeil();
   else if (S.overlay === 'kasse') ov = viewKasse();
+  else if (S.overlay === 'polls') ov = viewPolls();
   else if (S.overlay && S.overlay.year) ov = viewYear(S.overlay.year);
   else if (S.overlay && S.overlay.stage) ov = viewStage(S.overlay.stage);
   if (S.lightbox) ov += `<div class="lightbox" data-action="closeLightbox"><img src="${esc(S.lightbox)}" alt="Foto"><button class="close" aria-label="Schließen">×</button></div>`;
@@ -842,6 +911,49 @@ const actions = {
   close() { S.overlay = null; render(); },
   previewOn() { S.preview = true; S.overlay = null; applyPreview(); window.scrollTo(0, 0); render(); toast('Vorschau aktiv: Du siehst die App wie ein normales Mitglied.'); },
   previewOff() { endPreview(); render(); },
+  async vote(el) {
+    const pid = Number(el.dataset.poll), oid = Number(el.dataset.option);
+    const p = S.polls.find((x) => x.id === pid);
+    const mine = S.pollVotes.filter((v) => v.poll_id === pid && v.member_id === S.me.id).map((v) => v.option_id);
+    let next;
+    if (mine.includes(oid)) next = mine.filter((x) => x !== oid);
+    else next = p.multi ? mine.concat(oid) : [oid];
+    const { error } = await sb.rpc('vote_poll', { p_poll: pid, p_options: next });
+    if (error) { toast(error.message); return; }
+    S.pollVotes = S.pollVotes.filter((v) => !(v.poll_id === pid && v.member_id === S.me.id))
+      .concat(next.map((o) => ({ poll_id: pid, option_id: o, member_id: S.me.id })));
+    render();
+  },
+  pollAddOpt() { if (S.pollForm.opts.length < 8) S.pollForm.opts.push(''); render(); },
+  pollMulti(el) { S.pollForm.multi = el.dataset.v === '1'; render(); },
+  async pollCreate() {
+    const F = S.pollForm;
+    const question = F.q.trim(), opts = F.opts.map((o) => o.trim()).filter(Boolean);
+    if (question.length < 3) { toast('Bitte eine Frage eingeben.'); return; }
+    if (opts.length < 2) { toast('Bitte mindestens zwei Antworten eingeben.'); return; }
+    const closes = F.closes ? new Date(F.closes) : null;
+    if (closes && closes.getTime() <= now()) { toast('Das Ende muss in der Zukunft liegen.'); return; }
+    F.busy = true; render();
+    try {
+      const poll = await q(sb.from('polls').insert({ question, multi: F.multi, closes_at: closes ? closes.toISOString() : null, created_by: S.me.id }).select().single());
+      const rows = await q(sb.from('poll_options').insert(opts.map((label, i) => ({ poll_id: poll.id, label, sort: i }))).select());
+      S.polls.unshift(poll); S.pollOptions.push(...rows);
+      S.pollForm = { q: '', opts: ['', ''], multi: false, closes: '', busy: false };
+      toast('Abstimmung läuft. Die Jungs bekommen gleich eine Mitteilung.');
+    } catch (e) { F.busy = false; }
+    render();
+  },
+  async pollClose(el) {
+    const pid = Number(el.dataset.poll);
+    await q(sb.from('polls').update({ closed: true }).eq('id', pid));
+    S.polls = S.polls.map((p) => (p.id === pid ? { ...p, closed: true } : p)); render();
+  },
+  async pollDel(el) {
+    const pid = Number(el.dataset.poll);
+    if (!confirm('Abstimmung samt Stimmen löschen?')) return;
+    await q(sb.from('polls').delete().eq('id', pid));
+    S.polls = S.polls.filter((p) => p.id !== pid); render();
+  },
   async testPush() {
     if (!('Notification' in window) || Notification.permission !== 'granted') { toast('Erst Mitteilungen erlauben (Karte oben auf der Startseite).'); return; }
     const ok = await ensurePush();
@@ -1026,6 +1138,9 @@ const inputs = {
   loginEmail: (v) => { S.login.email = v; },
   loginCode: (v) => { S.login.code = v; },
   guestName: (v) => { S.guestName = v; },
+  pollQ: (v) => { S.pollForm.q = v; },
+  pollCloses: (v) => { S.pollForm.closes = v; },
+  pollOpt: (v, el) => { S.pollForm.opts[Number(el.dataset.i)] = v; },
   kTitle: (v) => { S.kasse.title = v; },
   schedTime: (v) => { S.sched.time = v; },
   schedTitle: (v) => { S.sched.title = v; },
@@ -1037,7 +1152,7 @@ app.addEventListener('click', (ev) => {
   const el = ev.target.closest('[data-action]');
   if (!el || el.disabled) return;
   const fn = actions[el.dataset.action];
-  const WRITES = ['rsvp', 'cycleRsvp', 'answer', 'saveEstimate', 'saveFree', 'crown', 'resolveNow', 'slotAdd', 'slotDel', 'pack', 'kSave', 'kDel', 'saveEmail', 'addGuest'];
+  const WRITES = ['vote', 'pollCreate', 'pollClose', 'pollDel', 'rsvp', 'cycleRsvp', 'answer', 'saveEstimate', 'saveFree', 'crown', 'resolveNow', 'slotAdd', 'slotDel', 'pack', 'kSave', 'kDel', 'saveEmail', 'addGuest'];
   if (S.preview && WRITES.includes(el.dataset.action)) { ev.preventDefault(); toast('In der Vorschau wird nichts gespeichert.'); return; }
   if (fn) { ev.preventDefault(); Promise.resolve(fn(el)).catch((e) => console.error(e)); }
 });
@@ -1083,7 +1198,7 @@ app.addEventListener('change', async (ev) => {
 
 app.addEventListener('input', (ev) => {
   const el = ev.target.closest('[data-input]');
-  if (el && inputs[el.dataset.input]) inputs[el.dataset.input](el.value);
+  if (el && inputs[el.dataset.input]) inputs[el.dataset.input](el.value, el);
 });
 app.addEventListener('keydown', (ev) => {
   if (ev.key !== 'Enter') return;
