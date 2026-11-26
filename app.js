@@ -109,7 +109,8 @@ async function loadAll() {
     q(sb.from('expense_shares').select('*'))
   ]);
   S.myAnswers = Object.fromEntries(answers.map((a) => [a.riddle_id, a]));
-  S.leaderboard = leaderboard; S.rsvps = rsvps;
+  S.rsvps = rsvps;
+  { const crewIds = new Set(tourCrew().map((m) => m.id)); S.leaderboard = leaderboard.filter((l) => crewIds.has(l.member_id) || l.answered > 0); }
   S.packing = Object.fromEntries(packing.map((p) => [p.item_key, p.checked]));
   S.expenses = expenses; S.shares = shares;
   S.riddlePoints = lastResolvedRiddle() ? await q(sb.rpc('riddle_points')) : [];
@@ -311,7 +312,9 @@ function lastResolvedRiddle() {
 
 // ---------------------------------------------------------------- Rückblick nach jeder Etappe
 function standings(riddleIds) {
-  const players = S.members.filter((m) => !m.is_guest && !m.is_quizmaster);
+  const active = new Set((S.riddlePoints || []).map((r) => r.member_id));
+  const crewIds = new Set(tourCrew().map((m) => m.id));
+  const players = S.members.filter((m) => !m.is_guest && !m.is_quizmaster && (crewIds.has(m.id) || active.has(m.id)));
   const pts = Object.fromEntries(players.map((m) => [m.id, 0]));
   for (const r of S.riddlePoints || []) if (riddleIds.has(r.riddle_id) && r.member_id in pts) pts[r.member_id] += r.points;
   const sorted = Object.values(pts).sort((a, b) => b - a);
@@ -345,7 +348,7 @@ function recapLines(lr) {
     if (best) lines.push(`📈 Aufsteiger der Etappe: ${best.m.nickname} (Platz ${best.from} → ${best.to})`);
   }
   const answered = new Set((S.riddlePoints || []).filter((r) => r.riddle_id === lr.id).map((r) => r.member_id));
-  const missing = after.players.filter((m) => !answered.has(m.id)).map((m) => m.nickname);
+  const missing = tourCrew().filter((m) => !answered.has(m.id)).map((m) => m.nickname);
   if (missing.length && missing.length <= 3) lines.push(`💤 Nicht getippt: ${andList(missing)}`);
   const zero = after.players.filter((m) => after.pts[m.id] === 0 && !missing.includes(m.nickname)).map((m) => m.nickname);
   if (lr.nr >= 3 && zero.length && zero.length <= 2) lines.push(`🥾 Noch ohne Punkt: ${andList(zero)}. Wird schon.`);
@@ -393,6 +396,14 @@ function viewTimeTravel() {
     <p class="muted small" style="margin:0">${fmtDate(photo.taken_on)}${day}${exact ? '' : ' · morgen gibt es ein neues Foto'}</p>
     <button class="btn ghost" data-action="openYear" data-year="${tour?.year || y}">Mehr von ${y}</button>
   </div>`;
+}
+
+// Wer bei der Tour dabei ist (Zusage „Ja“ oder „Vielleicht“), zählt bei Tipps, Abstimmungen und Rückblick.
+// Wer nicht mitfährt, aber trotzdem mitmacht, wird mitgezählt, sobald er getippt bzw. abgestimmt hat.
+function tourCrew() {
+  const base = S.members.filter((m) => !m.is_guest && !m.is_quizmaster);
+  const yes = base.filter((m) => ['ja', 'vielleicht'].includes(rsvpOf(m.id)));
+  return yes.length ? yes : base;
 }
 
 function participants() {
@@ -524,7 +535,7 @@ function viewNotifCard() {
 }
 
 function viewRiddleCard(cr, lr, first) {
-  const players = S.members.filter((m) => !m.is_guest && !m.is_quizmaster).length;
+  const players = tourCrew().length;
   const nextR = S.riddles.find((r) => new Date(r.publish_at).getTime() > now()) || null;
   const meQuiz = isQuizmaster();
   const lb = S.leaderboard.find((r) => r.member_id === S.me.id);
@@ -809,7 +820,7 @@ function viewTeil() {
 // ---------------------------------------------------------------- Abstimmungen
 const pollIsOpen = (p) => !p.closed && (!p.closes_at || new Date(p.closes_at).getTime() > now());
 const openPolls = () => S.polls.filter(pollIsOpen);
-const voters = () => S.members.filter((m) => !m.is_guest);
+const voters = () => tourCrew();
 
 function pollCard(p, inOverlay = false) {
   const opts = S.pollOptions.filter((o) => o.poll_id === p.id);
@@ -835,7 +846,7 @@ function pollCard(p, inOverlay = false) {
         </button>`;
       }).join('')}
     </div>
-    <p class="muted small">${people.size} von ${voters().length} haben abgestimmt${open && missing.length && missing.length <= 4 ? ' · fehlt noch: ' + esc(missing.join(', ')) : ''}</p>
+    <p class="muted small">${voters().filter((m) => people.has(m.id)).length} von ${voters().length} haben abgestimmt${open && missing.length && missing.length <= 4 ? ' · fehlt noch: ' + esc(missing.join(', ')) : ''}</p>
     ${isAdmin() && inOverlay ? `<div style="display:flex;gap:14px">
       ${open ? `<button class="btn ghost" data-action="pollClose" data-poll="${p.id}">Beenden</button>` : ''}
       <button class="btn ghost" data-action="pollDel" data-poll="${p.id}">Löschen</button></div>` : ''}
@@ -1110,7 +1121,7 @@ const actions = {
     if (!isAdmin()) return;
     const rid = Number(el.dataset.riddle);
     const r = S.riddles.find((x) => x.id === rid);
-    const players = S.members.filter((m) => !m.is_guest && !m.is_quizmaster).length;
+    const players = tourCrew().length;
     if (S.riddleCount < players && !confirmTwice(el)) return toast(`Erst ${S.riddleCount} von ${players} haben getippt. Zum Auflösen nochmal tippen.`);
     const at = new Date().toISOString();
     await q(sb.from('riddles').update({ resolve_at: at }).eq('id', rid));
