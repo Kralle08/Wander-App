@@ -69,7 +69,7 @@ async function q(promise) {
 }
 
 // Wird bei jeder Veröffentlichung erhöht (gleiche Zahl wie der Cache im Service Worker)
-const APP_VERSION = 36;
+const APP_VERSION = 37;
 
 // ---------------------------------------------------------------- Laden
 async function loadAll() {
@@ -824,7 +824,12 @@ function viewTeil() {
 // ---------------------------------------------------------------- Abstimmungen
 const pollIsOpen = (p) => !p.closed && (!p.closes_at || new Date(p.closes_at).getTime() > now());
 const openPolls = () => S.polls.filter(pollIsOpen);
-const voters = () => tourCrew();
+// Bei Abstimmungen zählt die Reiseleitung mit (beim Rätsel ist sie als Rätselmeister außen vor)
+const voters = () => {
+  const base = S.members.filter((m) => !m.is_guest);
+  const yes = base.filter((m) => ['ja', 'vielleicht'].includes(rsvpOf(m.id)));
+  return yes.length ? yes : base;
+};
 
 function pollCard(p, inOverlay = false) {
   const opts = S.pollOptions.filter((o) => o.poll_id === p.id);

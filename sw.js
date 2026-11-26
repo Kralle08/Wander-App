@@ -1,6 +1,6 @@
 // Einfacher Service Worker: hält die App-Hülle offline verfügbar.
 // Daten kommen immer frisch aus Supabase (kein Caching von API-Antworten).
-const CACHE = 'wander-shell-v36';
+const CACHE = 'wander-shell-v37';
 const SHELL = ['./', 'index.html', 'styles.css', 'app.js', 'config.js', 'manifest.webmanifest', 'icons/icon-192.png'];
 
 self.addEventListener('install', (e) => {
