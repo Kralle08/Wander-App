@@ -68,6 +68,9 @@ async function q(promise) {
   return data;
 }
 
+// Wird bei jeder Veröffentlichung erhöht (gleiche Zahl wie der Cache im Service Worker)
+const APP_VERSION = 36;
+
 // ---------------------------------------------------------------- Laden
 async function loadAll() {
   const [members, tours, organizers, photos, schedule, stages, reveals, revealContents, riddles, solutions, slots, riddleSched] = await Promise.all([
@@ -510,6 +513,7 @@ function viewStart() {
     ${S.me.is_admin && !S.preview ? `<button class="btn ghost" data-action="previewOn">Als Mitglied ansehen (Vorschau)</button>
     <button class="btn ghost" data-action="testPush">Test-Mitteilung an mich</button>` : ''}
     <button class="btn ghost" data-action="logout">Abmelden (${esc(S.me.nickname)})</button>
+    <p class="muted small" style="text-align:center;opacity:.6">App-Version ${APP_VERSION}</p>
   </div>`;
 }
 
