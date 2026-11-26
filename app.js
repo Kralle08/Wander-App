@@ -69,7 +69,7 @@ async function q(promise) {
 }
 
 // Wird bei jeder Veröffentlichung erhöht (gleiche Zahl wie der Cache im Service Worker)
-const APP_VERSION = 38;
+const APP_VERSION = 39;
 
 // ---------------------------------------------------------------- Laden
 async function loadAll() {
@@ -370,8 +370,9 @@ function berlinToday() {
   const g = (k) => p.find((x) => x.type === k).value;
   return { y: Number(g('year')), md: `${g('month')}-${g('day')}`, key: `${g('year')}-${g('month')}-${g('day')}` };
 }
+const isAdminId = (id) => !!S.members.find((m) => m.id === id)?.is_admin;
 function timeTravelPick() {
-  const pool = S.photos.filter((p) => p.taken_on && S.photoUrls[p.storage_path]);
+  const pool = S.photos.filter((p) => p.taken_on && S.photoUrls[p.storage_path] && (!p.uploaded_by || isAdminId(p.uploaded_by)));
   if (!pool.length) return null;
   const today = berlinToday();
   const seed = [...today.key].reduce((a, c) => (a * 31 + c.charCodeAt(0)) >>> 0, 7);
@@ -968,12 +969,13 @@ function viewPhotos(t) {
   const grid = ph.length ? `<div class="photogrid">${ph.map((p) => {
     const url = S.photoUrls[p.storage_path];
     return `<div class="ph">${url ? `<button class="phbtn" data-action="lightbox" data-path="${esc(p.storage_path)}" aria-label="Foto vergrößern"><img src="${esc(url)}" alt="${esc(p.caption || 'Foto ' + t.year)}" loading="lazy"></button>` : '<div class="phph"></div>'}
-      ${isAdmin() ? `<button class="phdel" data-action="photoDel" data-id="${p.id}" aria-label="Foto löschen">×</button>` : ''}</div>`;
-  }).join('')}</div>` : `<p class="muted">Noch keine Fotos.${isAdmin() ? '' : ' Ralle lädt sie nach und nach hoch.'}</p>`;
+      ${p.uploaded_by && !isAdminId(p.uploaded_by) ? `<span class="phby">${esc(nick(p.uploaded_by))}</span>` : ''}
+      ${isAdmin() || (p.uploaded_by && p.uploaded_by === S.me.id && !S.preview) ? `<button class="phdel" data-action="photoDel" data-id="${p.id}" aria-label="Foto löschen">×</button>` : ''}</div>`;
+  }).join('')}</div>` : `<p class="muted">Noch keine Fotos. Du hast welche? Rein damit!</p>`;
   return `<div class="card"><span class="label">Fotos${ph.length ? ' · ' + ph.length : ''}</span>${grid}
-    ${isAdmin() ? `<label class="btn" style="display:flex;align-items:center;justify-content:center;cursor:pointer">${S.uploading ? esc(S.uploading) : 'Fotos hinzufügen'}
+    <label class="btn" style="display:flex;align-items:center;justify-content:center;cursor:pointer">${S.uploading ? esc(S.uploading) : 'Eigene Fotos hinzufügen'}
       <input type="file" accept="image/*" multiple data-upload="${t.id}" data-year="${t.year}" style="display:none" ${S.uploading ? 'disabled' : ''}></label>
-      <p class="muted small">Die Fotos werden vor dem Hochladen verkleinert. Sehen können sie nur eingetragene Mitglieder.</p>` : ''}</div>`;
+    <p class="muted small">Fehlt ein Foto? Lad es hoch – es wird verkleinert und ist nur für die Crew sichtbar. Deine eigenen Fotos kannst du wieder löschen.</p></div>`;
 }
 
 // ---------------------------------------------------------------- Gesamtansicht
@@ -1301,6 +1303,7 @@ function photoDate(file, tourId, year) {
 app.addEventListener('change', async (ev) => {
   const el = ev.target.closest('[data-upload]');
   if (!el || !el.files?.length) return;
+  if (S.preview) { el.value = ''; toast('In der Vorschau wird nichts gespeichert.'); return; }
   const tourId = Number(el.dataset.upload), year = el.dataset.year;
   const files = [...el.files];
   let sort = S.photos.filter((p) => p.tour_id === tourId).length;
@@ -1313,7 +1316,7 @@ app.addEventListener('change', async (ev) => {
       const up = await sb.storage.from('tour-photos').upload(path, blob, { contentType: 'image/jpeg', upsert: false });
       if (up.error) throw up.error;
       const takenOn = photoDate(files[i], tourId, year);
-      const row = await q(sb.from('tour_photos').insert({ tour_id: tourId, storage_path: path, sort: sort++, taken_on: takenOn }).select().single());
+      const row = await q(sb.from('tour_photos').insert({ tour_id: tourId, storage_path: path, sort: sort++, taken_on: takenOn, uploaded_by: S.me.id }).select().single());
       S.photos.push(row); ok++;
     } catch (e) { console.error(e); toast('Ein Foto ging nicht: ' + (e.message || e)); }
   }
