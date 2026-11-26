@@ -253,3 +253,12 @@ h1, h2, h3 { font-family: Archivo, sans-serif; font-weight: 900; margin: 0; line
 .popt.on .pchk { background: var(--pine); border-color: var(--pine); }
 .popt .pwho { font-size: 12px; color: var(--muted); padding-left: 32px; }
 .field input[type="datetime-local"] { -webkit-appearance: none; appearance: none; }
+
+/* Rückblick nach jeder Etappe */
+.recap { display: flex; flex-direction: column; gap: 4px; margin-top: 6px; padding-top: 10px; border-top: 1px dashed #E2C9B8; font-size: 14px; }
+.recap b { font-size: 12px; letter-spacing: .08em; text-transform: uppercase; color: var(--accent); }
+
+/* Zeitreise */
+.timetravel { gap: 10px; }
+.timetravel .ttimg { border: none; padding: 0; background: none; border-radius: 14px; overflow: hidden; cursor: pointer; display: block; width: 100%; }
+.timetravel .ttimg img { display: block; width: 100%; aspect-ratio: 4 / 3; object-fit: cover; }

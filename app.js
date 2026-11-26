@@ -112,6 +112,7 @@ async function loadAll() {
   S.leaderboard = leaderboard; S.rsvps = rsvps;
   S.packing = Object.fromEntries(packing.map((p) => [p.item_key, p.checked]));
   S.expenses = expenses; S.shares = shares;
+  S.riddlePoints = lastResolvedRiddle() ? await q(sb.rpc('riddle_points')) : [];
   await loadRiddleExtras();
   if (S.preview) applyPreview();
   await refreshPhotoUrls();
@@ -308,6 +309,92 @@ function lastResolvedRiddle() {
   return [...S.riddles].reverse().find((r) => new Date(r.resolve_at).getTime() <= t) || null;
 }
 
+// ---------------------------------------------------------------- Rückblick nach jeder Etappe
+function standings(riddleIds) {
+  const players = S.members.filter((m) => !m.is_guest && !m.is_quizmaster);
+  const pts = Object.fromEntries(players.map((m) => [m.id, 0]));
+  for (const r of S.riddlePoints || []) if (riddleIds.has(r.riddle_id) && r.member_id in pts) pts[r.member_id] += r.points;
+  const sorted = Object.values(pts).sort((a, b) => b - a);
+  const rank = (id) => sorted.indexOf(pts[id]) + 1; // gleiche Punkte = gleicher Platz
+  return { pts, rank, players };
+}
+const andList = (a) => (a.length > 1 ? a.slice(0, -1).join(', ') + ' und ' + a[a.length - 1] : a[0] || '');
+function recapLines(lr) {
+  const done = S.riddles.filter((r) => new Date(r.resolve_at).getTime() <= new Date(lr.resolve_at).getTime()).map((r) => r.id);
+  const after = standings(new Set(done));
+  const before = standings(new Set(done.filter((id) => id !== lr.id)));
+  const lines = [];
+  const top = Math.max(...Object.values(after.pts));
+  if (top > 0) {
+    const leaders = after.players.filter((m) => after.pts[m.id] === top);
+    const prevTop = Math.max(...Object.values(before.pts));
+    const prevLeaders = prevTop > 0 ? before.players.filter((m) => before.pts[m.id] === prevTop).map((m) => m.id) : [];
+    const names = andList(leaders.map((m) => m.nickname));
+    const same = leaders.length === prevLeaders.length && leaders.every((m) => prevLeaders.includes(m.id));
+    if (!prevLeaders.length) lines.push(`🥇 Erste Führung: ${names} (${top} ${top === 1 ? 'Punkt' : 'Punkte'})`);
+    else if (same) lines.push(`🥇 ${names} ${leaders.length > 1 ? 'bleiben' : 'bleibt'} vorne (${top} ${top === 1 ? 'Punkt' : 'Punkte'})`);
+    else if (leaders.length > 1 && leaders.some((m) => prevLeaders.includes(m.id))) lines.push(`🥇 Gleichstand an der Spitze: ${names} (${top} ${top === 1 ? 'Punkt' : 'Punkte'})`);
+    else lines.push(`🥇 Neue Spitze: ${names} (${top} ${top === 1 ? 'Punkt' : 'Punkte'})`);
+  }
+  if (lr.nr > 1) {
+    let best = null;
+    for (const m of after.players) {
+      const jump = before.rank(m.id) - after.rank(m.id);
+      if (jump >= 2 && (!best || jump > best.jump)) best = { m, jump, from: before.rank(m.id), to: after.rank(m.id) };
+    }
+    if (best) lines.push(`📈 Aufsteiger der Etappe: ${best.m.nickname} (Platz ${best.from} → ${best.to})`);
+  }
+  const answered = new Set((S.riddlePoints || []).filter((r) => r.riddle_id === lr.id).map((r) => r.member_id));
+  const missing = after.players.filter((m) => !answered.has(m.id)).map((m) => m.nickname);
+  if (missing.length && missing.length <= 3) lines.push(`💤 Nicht getippt: ${andList(missing)}`);
+  const zero = after.players.filter((m) => after.pts[m.id] === 0 && !missing.includes(m.nickname)).map((m) => m.nickname);
+  if (lr.nr >= 3 && zero.length && zero.length <= 2) lines.push(`🥾 Noch ohne Punkt: ${andList(zero)}. Wird schon.`);
+  return lines;
+}
+function recapHtml(lr) {
+  if (!S.riddlePoints?.length) return '';
+  const lines = recapLines(lr);
+  if (!lines.length) return '';
+  return `<div class="recap"><b>Rückblick nach Etappe ${lr.nr}</b>${lines.map((l) => `<span>${esc(l)}</span>`).join('')}</div>`;
+}
+
+// ---------------------------------------------------------------- Zeitreise: jeden Tag ein Foto aus den alten Touren
+function berlinToday() {
+  const p = new Intl.DateTimeFormat('de-DE', { timeZone: 'Europe/Berlin', year: 'numeric', month: '2-digit', day: '2-digit' }).formatToParts(new Date());
+  const g = (k) => p.find((x) => x.type === k).value;
+  return { y: Number(g('year')), md: `${g('month')}-${g('day')}`, key: `${g('year')}-${g('month')}-${g('day')}` };
+}
+function timeTravelPick() {
+  const pool = S.photos.filter((p) => p.taken_on && S.photoUrls[p.storage_path]);
+  if (!pool.length) return null;
+  const today = berlinToday();
+  const seed = [...today.key].reduce((a, c) => (a * 31 + c.charCodeAt(0)) >>> 0, 7);
+  const exact = pool.filter((p) => p.taken_on.slice(5) === today.md && Number(p.taken_on.slice(0, 4)) < today.y);
+  const list = exact.length ? exact : pool;
+  return { photo: list[seed % list.length], exact: exact.length > 0, today };
+}
+function viewTimeTravel() {
+  const pick = timeTravelPick();
+  if (!pick) return '';
+  const { photo, exact, today } = pick;
+  const tour = S.tours.find((t) => t.id === photo.tour_id);
+  const y = Number(photo.taken_on.slice(0, 4));
+  const ago = today.y - y;
+  let day = '';
+  if (tour?.date_from) {
+    const n = Math.round((new Date(photo.taken_on) - new Date(tour.date_from)) / 864e5) + 1;
+    if (n >= 1 && n <= 5) day = ` · Tag ${n}`;
+  }
+  const label = exact ? `Heute vor ${ago} ${ago === 1 ? 'Jahr' : 'Jahren'}` : 'Zeitreise';
+  return `<div class="card timetravel">
+    <span class="label">${label}</span>
+    <button class="ttimg" data-action="lightbox" data-path="${esc(photo.storage_path)}" aria-label="Foto vergrößern"><img src="${esc(S.photoUrls[photo.storage_path])}" alt="Foto ${y}" loading="lazy"></button>
+    <p class="title" style="margin:0">${esc(tour?.title || 'Tour ' + y)} ${y}</p>
+    <p class="muted small" style="margin:0">${fmtDate(photo.taken_on)}${day}${exact ? '' : ' · morgen gibt es ein neues Foto'}</p>
+    <button class="btn ghost" data-action="openYear" data-year="${tour?.year || y}">Mehr von ${y}</button>
+  </div>`;
+}
+
 function participants() {
   const yes = S.members.filter((m) => rsvpOf(m.id) === 'ja');
   return yes.length ? yes : S.members.filter((m) => !m.is_guest);
@@ -370,6 +457,8 @@ function viewStart() {
 
     ${openPolls().slice(0, 2).map((p) => pollCard(p)).join('')}
     ${openPolls().length > 2 ? `<button class="btn ghost" data-action="open" data-overlay="polls">Alle ${openPolls().length} offenen Abstimmungen</button>` : ''}
+
+    ${viewTimeTravel()}
 
     ${rv.finished ? `
       <div class="card dark"><span class="label">Enthüllungen</span><p class="title">Alles enthüllt. Ab nach Mallorca!</p></div>
@@ -502,7 +591,8 @@ function viewRiddleCard(cr, lr, first) {
       ${isFree ? `<p style="margin:0;font-size:14px"><b>👑 Gekürt:</b> ${S.lastRight.length ? esc(S.lastRight.join(' · ')) : 'Ich küre noch.'}</p>
         ${S.lastAll.length ? `<details class="rall"><summary>Alle ${S.lastAll.length} Antworten lesen</summary>${freeAnswerList(lr, S.lastAll, isAdmin())}</details>` : ''}`
       : `<p style="margin:0;font-size:14px"><b>${lr.kind === 'schaetzen' ? 'Am nächsten dran' : 'Richtig lagen'}:</b> ${S.lastRight.length ? esc(S.lastRight.join(', ')) : 'niemand. Peinlich.'}</p>`}
-      ${mineLast && !meQuiz ? `<p style="margin:0;font-size:14px;font-weight:700;color:${iWasRight ? 'var(--ok)' : 'var(--accent-dark)'}">${isFree ? (iWasRight ? 'Und du bist dabei. Stark!' : 'Diesmal nicht gekürt.') : (iWasRight ? 'Du auch. Stark!' : 'Du leider nicht.')}</p>` : ''}</div>`;
+      ${mineLast && !meQuiz ? `<p style="margin:0;font-size:14px;font-weight:700;color:${iWasRight ? 'var(--ok)' : 'var(--accent-dark)'}">${isFree ? (iWasRight ? 'Und du bist dabei. Stark!' : 'Diesmal nicht gekürt.') : (iWasRight ? 'Du auch. Stark!' : 'Du leider nicht.')}</p>` : ''}
+      ${recapHtml(lr)}</div>`;
   }
   html += `<button class="btn ghost rlink" data-action="goQuizRank">Zur Rätsel-Rangliste</button></div>`;
   return html;
@@ -1187,7 +1277,9 @@ app.addEventListener('change', async (ev) => {
       const path = `${year}/${Date.now()}-${Math.random().toString(36).slice(2, 8)}.jpg`;
       const up = await sb.storage.from('tour-photos').upload(path, blob, { contentType: 'image/jpeg', upsert: false });
       if (up.error) throw up.error;
-      const row = await q(sb.from('tour_photos').insert({ tour_id: tourId, storage_path: path, sort: sort++ }).select().single());
+      const dm = files[i].name.match(/(20\d\d)-(\d\d)-(\d\d)/);
+      const takenOn = dm ? `${dm[1]}-${dm[2]}-${dm[3]}` : (files[i].lastModified ? new Date(files[i].lastModified).toISOString().slice(0, 10) : null);
+      const row = await q(sb.from('tour_photos').insert({ tour_id: tourId, storage_path: path, sort: sort++, taken_on: takenOn }).select().single());
       S.photos.push(row); ok++;
     } catch (e) { console.error(e); toast('Ein Foto ging nicht: ' + (e.message || e)); }
   }
