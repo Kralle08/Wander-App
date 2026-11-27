@@ -69,7 +69,7 @@ async function q(promise) {
 }
 
 // Wird bei jeder Veröffentlichung erhöht (gleiche Zahl wie der Cache im Service Worker)
-const APP_VERSION = 43;
+const APP_VERSION = 44;
 
 // ---------------------------------------------------------------- Laden
 async function loadAll() {
@@ -93,6 +93,7 @@ async function loadAll() {
     q(sb.from('poll_votes').select('*'))
   ]);
   S.polls = polls; S.pollOptions = pollOptions; S.pollVotes = pollVotes;
+  S.appStatus = S.me?.is_admin ? Object.fromEntries((await q(sb.rpc('member_app_status'))).map((r) => [r.member_id, r])) : null;
   S.members = members; S.tours = tours; S.organizers = organizers; S.stages = stages;
   S.reveals = reveals;
   // Fahrplan für alle 20 Etappen; Fragen nur für bereits veröffentlichte Rätsel
@@ -803,11 +804,19 @@ function viewTeil() {
   return overlayShell(`Teilnehmer · Mallorca ${TOUR_YEAR}`, `
     <h2 style="font-size:28px">Wer ist dabei?</h2>
     <p class="muted">${cnt.ja} dabei · ${cnt.vielleicht} vielleicht · ${cnt.nein} nicht dabei · ${cnt.offen} offen</p>
+    ${isAdmin() && S.appStatus ? (() => {
+      const crew = S.members.filter((m) => !m.is_guest && m.id !== S.me.id && ['ja', 'vielleicht'].includes(rsvpOf(m.id)));
+      const inApp = crew.filter((m) => S.appStatus[m.id]?.logged_in), push = crew.filter((m) => S.appStatus[m.id]?.push_on);
+      const missing = crew.filter((m) => !S.appStatus[m.id]?.logged_in).map((m) => m.nickname);
+      return `<div class="card dark"><span class="label">Nur für dich · App-Stand</span>
+        <p class="title" style="margin:0">${inApp.length} von ${crew.length} angemeldet · ${push.length} mit Mitteilungen</p>
+        <p class="muted small" style="margin:0">${missing.length ? 'Noch nicht drin: ' + esc(missing.join(', ')) : 'Alle sind drin. 🎉'}</p></div>`;
+    })() : ''}
     <div class="card" style="gap:0"><div class="list">
       ${S.members.map((m) => {
         const st = rsvpOf(m.id);
         return `<div class="row"><div class="grow"><b>${esc(m.nickname)}${m.id === S.me.id ? ' (du)' : ''}</b>
-          <span class="muted small">${m.is_guest ? 'Von mir hinzugefügt' : (st === 'offen' ? 'Hat noch nicht geantwortet' : '')}${isAdmin() && !m.is_guest ? (m.email ? ' · ' + esc(m.email) : ' · keine E-Mail hinterlegt') : ''}</span></div>
+          <span class="muted small">${m.is_guest ? 'Von mir hinzugefügt' : (st === 'offen' ? 'Hat noch nicht geantwortet' : '')}${isAdmin() && !m.is_guest ? (m.email ? ' · ' + esc(m.email) : ' · keine E-Mail hinterlegt') : ''}${isAdmin() && S.appStatus && !m.is_guest ? (S.appStatus[m.id]?.logged_in ? ' · ✓ in der App' + (S.appStatus[m.id]?.push_on ? ' · 🔔' : ' · 🔕 keine Mitteilungen') : ' · noch nicht angemeldet') : ''}</span></div>
           ${isAdmin() || m.id === S.me.id ? `<button class="pill ${st}" data-action="cycleRsvp" data-member="${m.id}">${ST_LABEL[st]}</button>` : `<span class="pill ${st}" style="display:inline-flex;align-items:center">${ST_LABEL[st]}</span>`}
         </div>
         ${isAdmin() && !m.is_guest ? `<div style="display:flex;gap:6px;padding-bottom:10px;border-bottom:1px solid #EEF1EA">
