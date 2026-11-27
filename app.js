@@ -69,7 +69,7 @@ async function q(promise) {
 }
 
 // Wird bei jeder Veröffentlichung erhöht (gleiche Zahl wie der Cache im Service Worker)
-const APP_VERSION = 48;
+const APP_VERSION = 49;
 
 // ---------------------------------------------------------------- Laden
 async function loadAll() {
@@ -761,8 +761,9 @@ function viewOrga() {
           return `<button class="slot" data-action="slotAdd" data-year="${y}" data-slot="${slot}">${slot === 1 ? 'Ich übernehme' : '+ Co-Orga'}<small>${slot === 1 ? 'Orga gesucht' : 'optional'}</small></button>`;
         }).join('')}</div></div>`).join('')}
     </div>
-    <div class="card"><span class="label">Orga-Bilanz · seit 2018</span>
+    <div class="card"><span class="label">Orga-Bilanz · 2018–${TOUR_YEAR - 1}</span>
       <p class="title" style="margin:0">Orga im Blut</p>
+      <p class="muted small" style="margin:0">Mallorca ${TOUR_YEAR} zählt erst nach der Tour.</p>
       <div class="podium">${step(1)}${step(0)}${step(2)}</div>
       ${fans.length ? `<div class="fanblock"><span class="fanicon">👏</span><div>
         <b>Ehrentribüne: ${esc(fans.join(' & '))}</b>
