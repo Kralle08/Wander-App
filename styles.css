@@ -270,3 +270,11 @@ h1, h2, h3 { font-family: Archivo, sans-serif; font-weight: 900; margin: 0; line
 /* Spam-Hinweis beim Login */
 .spamhint { display: flex; flex-direction: column; gap: 4px; background: #FFF1E6; border: 2px solid #F5B58C; border-radius: 14px; padding: 12px 14px; margin: 4px 0 8px; color: var(--ink); font-size: 14px; }
 .spamhint b { font-size: 15px; }
+
+/* Nutzung (Admin) */
+.usebars { display: grid; grid-template-columns: repeat(14, 1fr); gap: 4px; height: 90px; align-items: end; }
+.usebars div { display: flex; flex-direction: column; justify-content: flex-end; align-items: center; height: 100%; gap: 3px; }
+.usebars i { display: block; width: 100%; min-height: 2px; background: #F5B58C; border-radius: 3px 3px 0 0; }
+.usebars span { font-size: 9px; opacity: .7; }
+.usearea { display: flex; flex-direction: column; gap: 4px; }
+.usearea div { display: flex; justify-content: space-between; font-size: 14px; border-bottom: 1px solid rgba(255,255,255,.12); padding-bottom: 3px; }

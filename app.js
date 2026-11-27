@@ -69,7 +69,7 @@ async function q(promise) {
 }
 
 // Wird bei jeder Veröffentlichung erhöht (gleiche Zahl wie der Cache im Service Worker)
-const APP_VERSION = 45;
+const APP_VERSION = 46;
 
 // ---------------------------------------------------------------- Laden
 async function loadAll() {
@@ -94,6 +94,7 @@ async function loadAll() {
   ]);
   S.polls = polls; S.pollOptions = pollOptions; S.pollVotes = pollVotes;
   S.appStatus = S.me?.is_admin ? Object.fromEntries((await q(sb.rpc('member_app_status'))).map((r) => [r.member_id, r])) : null;
+  S.stats = S.me?.is_admin ? await q(sb.rpc('app_stats')) : null;
   S.members = members; S.tours = tours; S.organizers = organizers; S.stages = stages;
   S.reveals = reveals;
   // Fahrplan für alle 20 Etappen; Fragen nur für bereits veröffentlichte Rätsel
@@ -183,10 +184,19 @@ async function afterLogin() {
   S.me = me;
   await loadAll();
   render();
+  logEvent('open');
   ensurePush().finally(refreshPushState);
 }
 
 // ---------------------------------------------------------------- Push
+// ---------------------------------------------------------------- Nutzung (nur für die Reiseleitung sichtbar)
+const AREA_NAMES = { start: 'Start', etappen: 'Etappen', ranking: 'Ranking', archiv: 'Archiv', olympia: 'Olympiade', pack: 'Packliste', teil: 'Teilnehmer', kasse: 'Kasse', polls: 'Abstimmungen', year: 'Archiv-Jahr', stage: 'Tagesablauf' };
+function logEvent(kind, area) {
+  if (!S.me || S.me.is_admin || S.preview) return;
+  sb.rpc('log_event', { p_kind: kind, p_area: area || null }).then(() => {}, () => {});
+}
+document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'visible') logEvent('open'); });
+
 function pushOffFlag() { try { return localStorage.getItem('hike_push_off') === '1'; } catch (e) { return false; } }
 function setPushOffFlag(v) { try { v ? localStorage.setItem('hike_push_off', '1') : localStorage.removeItem('hike_push_off'); } catch (e) { /* egal */ } }
 // Zustand für den Schalter: 'unsupported' | 'safari' | 'default' | 'denied' | 'on' | 'off'
@@ -440,6 +450,26 @@ function tourCrew() {
   const base = S.members.filter((m) => !m.is_guest && !m.is_quizmaster);
   const yes = base.filter((m) => ['ja', 'vielleicht'].includes(rsvpOf(m.id)));
   return yes.length ? yes : base;
+}
+
+function lastSeenText(id) {
+  const ts = S.stats?.last_seen?.[id];
+  if (!ts) return '';
+  const days = Math.round((new Date(berlinToday().key) - new Date(new Date(ts).toLocaleDateString('sv-SE', { timeZone: 'Europe/Berlin' }))) / 864e5);
+  return ' · ' + (days <= 0 ? 'heute aktiv' : days === 1 ? 'gestern aktiv' : `vor ${days} Tagen aktiv`);
+}
+function viewUsage() {
+  const s = S.stats;
+  if (!s) return '';
+  const opens = s.opens || [], max = Math.max(1, ...opens.map((o) => o.n)), total = opens.reduce((a, o) => a + o.n, 0);
+  const areas = s.areas || [], sum = areas.reduce((a, x) => a + x.n, 0) || 1;
+  const wd = ['So', 'Mo', 'Di', 'Mi', 'Do', 'Fr', 'Sa'];
+  return `<div class="card dark"><span class="label">Nur für dich · Nutzung</span>
+    <p class="title" style="margin:0">${total} App-Öffnungen in 14 Tagen</p>
+    <div class="usebars">${opens.map((o) => `<div title="${o.day}: ${o.n}"><i style="height:${Math.round((o.n / max) * 100)}%"></i><span>${wd[new Date(o.day).getDay()]}</span></div>`).join('')}</div>
+    ${areas.length ? `<p class="muted small" style="margin:6px 0 0">Am meisten angeschaut (30 Tage):</p>
+      <div class="usearea">${areas.slice(0, 6).map((a) => `<div><span>${esc(AREA_NAMES[a.area] || a.area)}</span><b>${Math.round((a.n / sum) * 100)} %</b></div>`).join('')}</div>` : '<p class="muted small" style="margin:0">Noch keine Daten zu den Bereichen.</p>'}
+    <p class="muted small" style="margin:0;opacity:.7">Ohne deine eigenen Besuche. Eine Öffnung zählt höchstens alle 30 Minuten.</p></div>`;
 }
 
 function participants() {
@@ -842,13 +872,13 @@ function viewTeil() {
       const missing = crew.filter((m) => !S.appStatus[m.id]?.logged_in).map((m) => m.nickname);
       return `<div class="card dark"><span class="label">Nur für dich · App-Stand</span>
         <p class="title" style="margin:0">${inApp.length} von ${crew.length} angemeldet · ${push.length} mit Mitteilungen</p>
-        <p class="muted small" style="margin:0">${missing.length ? 'Noch nicht drin: ' + esc(missing.join(', ')) : 'Alle sind drin. 🎉'}</p></div>`;
+        <p class="muted small" style="margin:0">${missing.length ? 'Noch nicht drin: ' + esc(missing.join(', ')) : 'Alle sind drin. 🎉'}</p></div>${viewUsage()}`;
     })() : ''}
     <div class="card" style="gap:0"><div class="list">
       ${S.members.map((m) => {
         const st = rsvpOf(m.id);
         return `<div class="row"><div class="grow"><b>${esc(m.nickname)}${m.id === S.me.id ? ' (du)' : ''}</b>
-          <span class="muted small">${m.is_guest ? 'Von mir hinzugefügt' : (st === 'offen' ? 'Hat noch nicht geantwortet' : '')}${isAdmin() && !m.is_guest ? (m.email ? ' · ' + esc(m.email) : ' · keine E-Mail hinterlegt') : ''}${isAdmin() && S.appStatus && !m.is_guest ? (S.appStatus[m.id]?.logged_in ? ' · ✓ in der App' + (S.appStatus[m.id]?.push_on ? ' · 🔔' : ' · 🔕 keine Mitteilungen') : ' · noch nicht angemeldet') : ''}</span></div>
+          <span class="muted small">${m.is_guest ? 'Von mir hinzugefügt' : (st === 'offen' ? 'Hat noch nicht geantwortet' : '')}${isAdmin() && !m.is_guest ? (m.email ? ' · ' + esc(m.email) : ' · keine E-Mail hinterlegt') : ''}${isAdmin() && S.appStatus && !m.is_guest ? (S.appStatus[m.id]?.logged_in ? ' · ✓ in der App' + (S.appStatus[m.id]?.push_on ? ' · 🔔' : ' · 🔕 keine Mitteilungen') + lastSeenText(m.id) : ' · noch nicht angemeldet') : ''}</span></div>
           ${isAdmin() || m.id === S.me.id ? `<button class="pill ${st}" data-action="cycleRsvp" data-member="${m.id}">${ST_LABEL[st]}</button>` : `<span class="pill ${st}" style="display:inline-flex;align-items:center">${ST_LABEL[st]}</span>`}
         </div>
         ${isAdmin() && !m.is_guest ? `<div style="display:flex;gap:6px;padding-bottom:10px;border-bottom:1px solid #EEF1EA">
@@ -1056,11 +1086,11 @@ const actions = {
   backToEmail() { S.login.step = 'email'; S.login.code = ''; S.login.error = ''; render(); },
   async logout() { await sb.auth.signOut(); S.session = null; S.me = null; render(); },
   reload() { location.reload(); },
-  tab(el) { S.tab = el.dataset.tab; S.overlay = null; window.scrollTo(0, 0); render(); },
+  tab(el) { S.tab = el.dataset.tab; S.overlay = null; window.scrollTo(0, 0); render(); logEvent('view', S.tab); },
   seg(el) { S.rankSeg = el.dataset.seg; render(); },
   goQuizRank() { S.tab = 'ranking'; S.rankSeg = 'quiz'; S.overlay = null; window.scrollTo(0, 0); render(); },
-  open(el) { S.overlay = el.dataset.overlay; S.kasse.forIds = null; render(); },
-  openYear(el) { S.overlay = { year: Number(el.dataset.year) }; render(); },
+  open(el) { S.overlay = el.dataset.overlay; S.kasse.forIds = null; render(); logEvent('view', S.overlay); },
+  openYear(el) { S.overlay = { year: Number(el.dataset.year) }; render(); logEvent('view', 'year'); },
   close() { S.overlay = null; render(); },
   previewOn() { S.preview = true; S.overlay = null; applyPreview(); window.scrollTo(0, 0); render(); toast('Vorschau aktiv: Du siehst die App wie ein normales Mitglied.'); },
   previewOff() { endPreview(); render(); },
