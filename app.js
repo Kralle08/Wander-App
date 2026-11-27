@@ -69,7 +69,7 @@ async function q(promise) {
 }
 
 // Wird bei jeder Veröffentlichung erhöht (gleiche Zahl wie der Cache im Service Worker)
-const APP_VERSION = 46;
+const APP_VERSION = 47;
 
 // ---------------------------------------------------------------- Laden
 async function loadAll() {
@@ -737,8 +737,16 @@ function viewOrga() {
   const counts = {};
   S.organizers.filter((o) => S.tours.find((t) => t.id === o.tour_id && t.year < TOUR_YEAR))
     .forEach((o) => { counts[o.member_id] = (counts[o.member_id] || 0) + 1; });
-  const bilanz = Object.entries(counts).sort((a, b) => b[1] - a[1]).map(([id, n]) => `${esc(nick(id))} ${n}×`).join(' · ');
-  const never = S.members.filter((m) => !m.is_guest && !counts[m.id] && !S.organizers.some((o) => o.member_id === m.id)).map((m) => m.nickname);
+  // Treppchen: gleiche Anzahl = gleicher Platz (1., 2., 3. nach Anzahl Touren)
+  const levels = [...new Set(Object.values(counts))].sort((a, b) => b - a).slice(0, 3);
+  const step = (i) => {
+    const n = levels[i];
+    if (n == null) return '<div class="pstep empty"></div>';
+    const names = Object.entries(counts).filter(([, c]) => c === n).map(([id]) => esc(nick(id)));
+    const icon = ['🏆', '🥈', '🥉'][i];
+    return `<div class="pstep p${i + 1}"><div class="pnames">${names.map((x) => `<span>${x}</span>`).join('')}</div>
+      <div class="pblock"><span class="picon">${icon}</span><b>${i + 1}</b><small>${n}× Orga</small></div></div>`;
+  };
   return `
     <div class="card">
       <span class="label">Orga-Kalender</span>
@@ -752,9 +760,9 @@ function viewOrga() {
           return `<button class="slot" data-action="slotAdd" data-year="${y}" data-slot="${slot}">${slot === 1 ? 'Ich übernehme' : '+ Co-Orga'}<small>${slot === 1 ? 'Orga gesucht' : 'optional'}</small></button>`;
         }).join('')}</div></div>`).join('')}
     </div>
-    <div class="card"><span class="label">Orga-Bilanz</span>
-      <p style="margin:0;font-size:15px;line-height:1.45">${bilanz}</p>
-      ${never.length ? `<p class="muted">Noch nie organisiert: ${esc(never.join(' und '))}. Nur so als Hinweis.</p>` : ''}
+    <div class="card"><span class="label">Orga-Bilanz · seit 2018</span>
+      <p class="title" style="margin:0">Orga im Blut</p>
+      <div class="podium">${step(1)}${step(0)}${step(2)}</div>
     </div>
 `;
 }
