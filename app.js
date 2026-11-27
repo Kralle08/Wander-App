@@ -69,7 +69,7 @@ async function q(promise) {
 }
 
 // Wird bei jeder Veröffentlichung erhöht (gleiche Zahl wie der Cache im Service Worker)
-const APP_VERSION = 41;
+const APP_VERSION = 42;
 
 // ---------------------------------------------------------------- Laden
 async function loadAll() {
@@ -772,7 +772,7 @@ const PACK = [
     ['beutel', 'Beutel für dreckige Wäsche']]],
   ['KULTURBEUTEL (ORIGINAL)', [['dusche', 'Reiseduschgel/Zahnpasta/Deo'], ['medis', 'Medikamente'], ['ohren', 'Ohrstöpsel'], ['buerste', 'Bürste für Schuhe']]],
   ['SEIT 2019 UNGEKLÄRT', [['seil', 'Seil (Stürmi: „Wofür war nochmal das Seil?“)'], ['angel', 'Angelhaken'], ['kabel', 'Kabelbinder'], ['wanderkarte', 'Wanderkarte']]],
-  ['NEU · ZU WASSER', [['badehose', 'Badehose (Ossi 2019: „Hosen brauchen wir ja nicht“)'], ['handtuch', 'Handtuch'], ['badeschuhe', 'Badeschuhe für die felsigen Buchten'], ['sonne', 'Sonnencreme']]],
+  ['NEU · ZU WASSER', [['badehose', 'Badehose'], ['handtuch', 'Handtuch'], ['badeschuhe', 'Badeschuhe für die felsigen Buchten'], ['sonne', 'Sonnencreme']]],
   ['NEU · IN DER LUFT', [['ausweis', 'Personalausweis'], ['bordkarte', 'Bordkarte aufs Handy'], ['powerbank', 'Powerbank (ins Handgepäck)'], ['karte', 'Krankenversicherungskarte']]],
   ['NEU · TRADITION', [['schnaps', 'Starterschnaps'], ['witze', 'Neue Witze (Ralle)'], ['pool', 'Form für die Jubiläums-Olympiade']]]
 ];
