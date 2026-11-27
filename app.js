@@ -69,7 +69,7 @@ async function q(promise) {
 }
 
 // Wird bei jeder Veröffentlichung erhöht (gleiche Zahl wie der Cache im Service Worker)
-const APP_VERSION = 44;
+const APP_VERSION = 45;
 
 // ---------------------------------------------------------------- Laden
 async function loadAll() {
@@ -183,15 +183,46 @@ async function afterLogin() {
   S.me = me;
   await loadAll();
   render();
-  ensurePush();
+  ensurePush().finally(refreshPushState);
 }
 
 // ---------------------------------------------------------------- Push
+function pushOffFlag() { try { return localStorage.getItem('hike_push_off') === '1'; } catch (e) { return false; } }
+function setPushOffFlag(v) { try { v ? localStorage.setItem('hike_push_off', '1') : localStorage.removeItem('hike_push_off'); } catch (e) { /* egal */ } }
+// Zustand für den Schalter: 'unsupported' | 'safari' | 'default' | 'denied' | 'on' | 'off'
+async function refreshPushState() {
+  const standalone = window.matchMedia('(display-mode: standalone)').matches || window.navigator.standalone;
+  const ios = /iphone|ipad|ipod/i.test(navigator.userAgent);
+  let st;
+  if (!('Notification' in window) || !('serviceWorker' in navigator) || !('PushManager' in window)) st = ios && !standalone ? 'safari' : 'unsupported';
+  else if (Notification.permission === 'denied') st = 'denied';
+  else if (Notification.permission === 'default') st = 'default';
+  else {
+    try { const reg = await navigator.serviceWorker.ready; st = (await reg.pushManager.getSubscription()) && !pushOffFlag() ? 'on' : 'off'; } catch (e) { st = 'off'; }
+  }
+  if (S.pushState !== st) { S.pushState = st; render(); }
+}
+function viewPushSetting() {
+  const st = S.pushState;
+  if (!st || st === 'unsupported') return '';
+  const text = {
+    on: '🔔 Mitteilungen sind an. Ich melde mich bei neuen Rätseln, Auflösungen, Enthüllungen und Abstimmungen.',
+    off: '🔕 Mitteilungen sind aus. Du verpasst Rätsel und Enthüllungen nur, wenn du nicht reinschaust.',
+    default: '🔕 Mitteilungen sind noch nicht erlaubt.',
+    denied: '🔕 Mitteilungen sind am Handy gesperrt. Zum Einschalten: iPhone-Einstellungen → Mitteilungen → HIKE! → „Mitteilungen erlauben“. Danach die App neu öffnen.',
+    safari: '🔕 Mitteilungen gehen nur, wenn du HIKE! über das Icon auf dem Home-Bildschirm öffnest, nicht im Browser.'
+  }[st];
+  const btn = st === 'on' ? `<button class="btn ghost" data-action="pushOff">Mitteilungen ausschalten</button>`
+    : (st === 'off' || st === 'default') ? `<button class="btn block" data-action="pushOn">Mitteilungen einschalten</button>` : '';
+  return `<div class="card"><span class="label">Mitteilungen</span><p class="muted small" style="margin:0">${text}</p>${btn}</div>`;
+}
+
 // Meldet dieses Gerät für Push an (nur wenn Mitteilungen erlaubt sind) und merkt es sich in Supabase.
 async function ensurePush() {
   try {
     if (!('serviceWorker' in navigator) || !('PushManager' in window) || !('Notification' in window)) return false;
     if (Notification.permission !== 'granted') return false;
+    if (pushOffFlag()) return false;
     const reg = await navigator.serviceWorker.ready;
     let sub = await reg.pushManager.getSubscription();
     if (!sub) {
@@ -514,6 +545,7 @@ function viewStart() {
     </div>
     ${S.me.is_admin && !S.preview ? `<button class="btn ghost" data-action="previewOn">Als Mitglied ansehen (Vorschau)</button>
     <button class="btn ghost" data-action="testPush">Test-Mitteilung an mich</button>` : ''}
+    ${viewPushSetting()}
     <button class="btn ghost" data-action="logout">Abmelden (${esc(S.me.nickname)})</button>
     <p class="muted small" style="text-align:center;opacity:.6">App-Version ${APP_VERSION}</p>
   </div>`;
@@ -1107,15 +1139,38 @@ const actions = {
     S.photos = S.photos.filter((x) => x.id !== id); render();
   },
 
+  async pushOn() {
+    setPushOffFlag(false);
+    if (Notification.permission === 'default') { try { await Notification.requestPermission(); } catch (e) { /* egal */ } }
+    if (Notification.permission === 'granted') {
+      const ok = await ensurePush();
+      toast(ok ? 'Mitteilungen sind an. 🔔' : 'Das hat nicht geklappt. Öffne die App bitte über das Icon auf dem Home-Bildschirm.');
+    } else if (Notification.permission === 'denied') {
+      toast('Am Handy gesperrt: Einstellungen → Mitteilungen → HIKE! → erlauben.');
+    }
+    S.pushState = null; await refreshPushState(); render();
+  },
+  async pushOff() {
+    if (!confirm('Mitteilungen wirklich ausschalten? Dann bekommst du keine Hinweise auf neue Rätsel und Enthüllungen.')) return;
+    try {
+      const reg = await navigator.serviceWorker.ready;
+      const sub = await reg.pushManager.getSubscription();
+      if (sub) { await sb.from('push_subscriptions').delete().eq('endpoint', sub.endpoint); await sub.unsubscribe(); }
+    } catch (e) { console.error(e); }
+    setPushOffFlag(true);
+    toast('Mitteilungen sind aus. Einschalten geht jederzeit hier.');
+    S.pushState = null; await refreshPushState(); render();
+  },
   async allowNotif() {
     try { await Notification.requestPermission(); } catch (e) { /* ignorieren */ }
     if (Notification.permission === 'granted') {
+      setPushOffFlag(false);
       const ok = await ensurePush();
       toast(ok ? 'Mitteilungen sind an. Ich melde mich, wenn es etwas Neues gibt!' : 'Mitteilungen erlaubt, aber die Anmeldung hat nicht geklappt. Öffne die App bitte über den Home-Bildschirm.');
     } else {
-      toast('Kein Problem. Du kannst Mitteilungen später in den Einstellungen erlauben.');
+      toast('Kein Problem. Unten auf der Startseite kannst du Mitteilungen jederzeit einschalten.');
     }
-    render();
+    S.pushState = null; await refreshPushState(); render();
   },
 
   async rsvp(el) { await setRsvp(S.me.id, el.dataset.status); },
