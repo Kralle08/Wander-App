@@ -69,7 +69,7 @@ async function q(promise) {
 }
 
 // Wird bei jeder Veröffentlichung erhöht (gleiche Zahl wie der Cache im Service Worker)
-const APP_VERSION = 42;
+const APP_VERSION = 43;
 
 // ---------------------------------------------------------------- Laden
 async function loadAll() {
@@ -230,7 +230,8 @@ function viewLogin() {
         <button class="btn block" data-action="sendCode" ${L.busy ? 'disabled' : ''}>Code schicken</button>
       ` : `
         <p class="title">Code eingeben</p>
-        <p class="muted">Ich habe dir eine Mail an <b>${esc(L.email)}</b> geschickt. Steht darin ein Code, gib ihn hier ein. Steht darin ein Link, tipp ihn an, am besten auf diesem Gerät und in diesem Browser. Schau auch im Spam-Ordner nach.</p>
+        <p class="muted">Ich habe dir eine Mail an <b>${esc(L.email)}</b> geschickt. Steht darin ein Code, gib ihn hier ein. Steht darin ein Link, tipp ihn an, am besten auf diesem Gerät und in diesem Browser.</p>
+        <div class="spamhint"><b>📬 Keine Mail da? Schau im Spam-Ordner nach!</b><span>Absender „HIKE!“. Bei web.de, GMX & Co. landet sie gern dort. Am besten gleich als „Kein Spam“ markieren.</span></div>
         <label class="field">Code
           <input class="code-input" inputmode="numeric" autocomplete="one-time-code" maxlength="10" data-input="loginCode" value="${esc(L.code)}">
         </label>
