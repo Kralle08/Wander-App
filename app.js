@@ -69,7 +69,7 @@ async function q(promise) {
 }
 
 // Wird bei jeder Veröffentlichung erhöht (gleiche Zahl wie der Cache im Service Worker)
-const APP_VERSION = 47;
+const APP_VERSION = 48;
 
 // ---------------------------------------------------------------- Laden
 async function loadAll() {
@@ -737,6 +737,7 @@ function viewOrga() {
   const counts = {};
   S.organizers.filter((o) => S.tours.find((t) => t.id === o.tour_id && t.year < TOUR_YEAR))
     .forEach((o) => { counts[o.member_id] = (counts[o.member_id] || 0) + 1; });
+  const fans = S.members.filter((m) => !m.is_guest && !S.organizers.some((o) => o.member_id === m.id)).map((m) => m.nickname);
   // Treppchen: gleiche Anzahl = gleicher Platz (1., 2., 3. nach Anzahl Touren)
   const levels = [...new Set(Object.values(counts))].sort((a, b) => b - a).slice(0, 3);
   const step = (i) => {
@@ -763,6 +764,9 @@ function viewOrga() {
     <div class="card"><span class="label">Orga-Bilanz · seit 2018</span>
       <p class="title" style="margin:0">Orga im Blut</p>
       <div class="podium">${step(1)}${step(0)}${step(2)}</div>
+      ${fans.length ? `<div class="fanblock"><span class="fanicon">👏</span><div>
+        <b>Ehrentribüne: ${esc(fans.join(' & '))}</b>
+        <span>Jede gute Orga braucht ein Publikum, das mitläuft, applaudiert und hinterher genau weiß, was man besser machen könnte. Unersetzlich.</span></div></div>` : ''}
     </div>
 `;
 }

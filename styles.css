@@ -292,3 +292,8 @@ h1, h2, h3 { font-family: Archivo, sans-serif; font-weight: 900; margin: 0; line
 .p2 .pblock { background: #4C6A5A; min-height: 112px; }
 .p3 .pblock { background: #7C9486; min-height: 84px; }
 .p1 .pnames { font-size: 17px; }
+.fanblock { display: flex; gap: 12px; align-items: flex-start; margin-top: 12px; padding: 12px 14px; border-radius: 14px; background: #FFF1E6; border: 1.5px dashed #F5B58C; }
+.fanblock .fanicon { font-size: 28px; line-height: 1; }
+.fanblock div { display: flex; flex-direction: column; gap: 3px; }
+.fanblock b { font-size: 15px; }
+.fanblock span { font-size: 13.5px; color: var(--muted); line-height: 1.4; }
